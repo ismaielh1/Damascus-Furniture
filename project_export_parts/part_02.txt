@@ -1,0 +1,4176 @@
+--- FILE: lib/core/models/models.dart ---
+// lib/core/models/models.dart
+
+import 'package:flutter/material.dart';
+// import 'package:my_store_app/l10n/app_localizations.dart'; // سنعيد تفعيله لاحقًا
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// يحدد نوع الوجهة التي يجب أن ينتقل إليها البانر عند النقر عليه.
+enum BannerTargetType {
+  product,   // يوجه إلى صفحة منتج معين
+  category,  // يوجه إلى صفحة فئة معينة
+  search,    // يوجه إلى نتائج بحث معينة
+  none,      // البانر غير قابل للنقر
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+/// نموذج بيانات الفئة (مثل: إلكترونيات، أزياء، مستلزمات المنزل).
+class Category {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String imageUrl; // صورة كبيرة للفئة
+  final String? parentCategoryId; // لدعم الفئات الفرعية مستقبلاً (e.g., 'ملابس' -> 'رجال')
+
+  Category({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.imageUrl,
+    this.parentCategoryId,
+  });
+
+  /// الحصول على الاسم المترجم بناءً على لغة التطبيق الحالية.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+}
+
+/// نموذج بيانات المنتج، مع إضافة حقول جديدة.
+class Product {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String productNumber;
+  final double price; // السعر بالدولار الأمريكي
+  final String descriptionAr;
+  final String descriptionEn;
+  final List<String> imageUrls; // قائمة بالصور لعرضها في معرض صور
+  final String categoryId; // لربط المنتج بالفئة التي ينتمي إليها
+  final String? brand; // ماركة المنتج (اختياري)
+  final List<String>? tags; // كلمات مفتاحية للبحث (اختياري)
+
+  Product({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.productNumber,
+    required this.price,
+    required this.descriptionAr,
+    required this.descriptionEn,
+    required this.imageUrls,
+    required this.categoryId,
+    this.brand,
+    this.tags,
+  });
+
+  /// الحصول على الاسم المترجم.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+
+  /// الحصول على الوصف المترجم.
+  String getLocalizedDescription(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? descriptionAr : descriptionEn;
+  }
+}
+
+/// نموذج بيانات البانر الإعلاني للشاشة الرئيسية.
+class BannerAd {
+  final String id;
+  final String imageUrl;
+  final BannerTargetType targetType; // نوع الوجهة
+  final String? targetId; // معرّف المنتج أو الفئة أو كلمة البحث
+
+  BannerAd({
+    required this.id,
+    required this.imageUrl,
+    this.targetType = BannerTargetType.none,
+    this.targetId,
+  });
+}
+
+/// نموذج بيانات المستخدم (كما هو من قبل، مع الحقول الأساسية).
+class AppUser {
+  final String uid;
+  final String? email;
+  final String? name;
+  final String? profileImageUrl;
+  final bool isAdmin;
+  final String? locale;
+  final String? address;
+
+  AppUser({
+    required this.uid,
+    this.email,
+    this.name,
+    this.profileImageUrl,
+    this.isAdmin = false,
+    this.locale,
+    this.address,
+  });
+}
+
+
+/// نموذج بيانات عنصر السلة (كما هو من قبل).
+class CartItem {
+  final Product product;
+  int quantity;
+
+  CartItem({required this.product, this.quantity = 1});
+}
+
+
+--- FILE: lib/core/models/rive_model.dart ---
+// lib/core/models/rive_model.dart
+
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
+
+class RiveUtils {
+  static StateMachineController getRiveController(Artboard artboard, {String? stateMachineName}) {
+    StateMachineController? controller = StateMachineController.fromArtboard(artboard, stateMachineName ?? 'State Machine 1');
+    if (controller == null) {
+      throw Exception('Could not find Rive StateMachineController');
+    }
+    artboard.addController(controller);
+    return controller;
+  }
+}
+
+class RiveModel {
+  final String src;
+  final String artboard;
+  final String stateMachineName;
+  final String title;
+  late SMIBool? input;
+
+  RiveModel({
+    required this.src,
+    required this.artboard,
+    required this.stateMachineName,
+    required this.title,
+  });
+
+  set setInput(SMIBool status) {
+    input = status;
+  }
+}
+
+
+--- FILE: lib/core/services/supabase_service.dart ---
+// lib/core/services/supabase_service.dart
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class SupabaseService {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  // --- الدالة الجديدة ---
+  /// جلب بيانات AppUser من جدول users باستخدام uid
+  Future<AppUser?> getUserData(String uid) async {
+    try {
+      final data = await _client.from('users').select().eq('id', uid).single();
+      // تحويل الـ Map إلى كائن AppUser
+      return AppUser(
+        uid: data['id'],
+        email: data['email'],
+        name: data['name'],
+        profileImageUrl: data['profile_image_url'],
+        isAdmin: data['is_admin'] ?? false,
+        locale: data['locale'],
+        address: data['address'],
+      );
+    } catch (e) {
+      // قد لا يكون المستخدم موجودًا في جدولنا بعد، أو قد يحدث خطأ
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+  // --- نهاية الدالة الجديدة ---
+  
+  Future<Product> getProductById(String productId) async {
+    try {
+      final response = await _client.from('products').select().eq('id', productId).single();
+      return Product(
+        id: response['id'].toString(), nameAr: response['name_ar'], nameEn: response['name_en'],
+        productNumber: response['product_number'], price: (response['price'] as num).toDouble(),
+        descriptionAr: response['description_ar'], descriptionEn: response['description_en'],
+        imageUrls: List<String>.from(response['image_urls']), categoryId: response['category_id'].toString(),
+        brand: response['brand'], tags: List<String>.from(response['tags'] ?? []),
+      );
+    } catch (e) {
+      print('Error getting product by ID from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _client.from('products').select().eq('category_id', categoryId);
+      return response.map((item) => Product(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        productNumber: item['product_number'], price: (item['price'] as num).toDouble(),
+        descriptionAr: item['description_ar'], descriptionEn: item['description_en'],
+        imageUrls: List<String>.from(item['image_urls']), categoryId: item['category_id'].toString(),
+        brand: item['brand'], tags: List<String>.from(item['tags'] ?? []),
+      )).toList();
+    } catch (e) {
+      print('Error getting products by category from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Category>> getCategories() async {
+    try {
+      final response = await _client.from('categories').select();
+      return response.map((item) => Category(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        imageUrl: item['image_url'], parentCategoryId: item['parent_category_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting categories from Supabase: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<BannerAd>> getBanners() async {
+    try {
+      final response = await _client.from('banners').select();
+      return response.map((item) => BannerAd(
+        id: item['id'].toString(), imageUrl: item['image_url'],
+        targetType: BannerTargetType.values.byName(item['target_type'] ?? 'none'),
+        targetId: item['target_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting banners from Supabase: $e');
+      rethrow;
+    }
+  }
+}
+
+
+--- FILE: lib/core/theme/app_colors.dart ---
+// lib/core/theme/app_colors.dart
+
+import 'package:flutter/material.dart';
+
+class AppColors {
+  // --- لوحة الألوان الجديدة ---
+  static const Color primary = Color(0xFF0D47A1);   // أزرق داكن وأنيق
+  static const Color secondary = Color(0xFF00BCD4);  // سماوي/تركواز حيوي
+  
+  // ألوان الخلفيات والأسطح
+  static const Color background = Color(0xFFF4F6F8); // رمادي فاتح جدًا ومريح
+  static const Color surface = Colors.white;
+
+  // ألوان النصوص
+  static const Color textPrimary = Color(0xFF1A2536); // أسود غير حاد
+  static const Color textSecondary = Color(0xFF707070); // رمادي للنصوص الثانوية
+
+  // ألوان أخرى
+  static const Color error = Color(0xFFD32F2F);
+  static const Color success = Color(0xFF388E3C);
+  static const Color white = Colors.white;
+}
+
+
+--- FILE: lib/core/theme/app_theme.dart ---
+// lib/core/theme/app_theme.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/theme/app_colors.dart';
+
+class AppTheme {
+  static final ThemeData lightTheme = ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Poppins',
+    primaryColor: AppColors.primary,
+    scaffoldBackgroundColor: AppColors.background,
+
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      primary: AppColors.primary,
+      secondary: AppColors.secondary,
+      background: AppColors.background,
+      surface: AppColors.surface,
+      error: AppColors.error,
+      brightness: Brightness.light,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      elevation: 1.0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600),
+    ),
+
+    cardTheme: CardThemeData(
+      elevation: 1.0,
+      shadowColor: Colors.black12,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+      ),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    ),
+
+    textTheme: const TextTheme(
+      headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      bodyLarge: TextStyle(color: AppColors.textPrimary, height: 1.5),
+      bodyMedium: TextStyle(color: AppColors.textSecondary),
+    ),
+  );
+}
+
+
+--- FILE: lib/features/admin/presentation/pages/admin_panel_page.dart ---
+// lib/features/admin/presentation/pages/admin_panel_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class AdminPanelPage extends ConsumerWidget {
+  const AdminPanelPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة تحكم المسؤول'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // قائمة بالوظائف الإدارية
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined),
+            title: const Text('إدارة المنتجات'),
+            subtitle: const Text('إضافة، تعديل، وحذف المنتجات'),
+            onTap: () {
+              // TODO: Navigate to Manage Products screen
+              print('Navigate to Manage Products');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('إدارة الفئات'),
+            subtitle: const Text('إضافة، تعديل، وحذف الفئات'),
+            onTap: () {
+              // TODO: Navigate to Manage Categories screen
+              print('Navigate to Manage Categories');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.view_carousel_outlined),
+            title: const Text('إدارة البانرات'),
+            subtitle: const Text('إضافة، تعديل، وحذف البانرات الإعلانية'),
+            onTap: () {
+              // TODO: Navigate to Manage Banners screen
+              print('Navigate to Manage Banners');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/auth/presentation/providers/auth_providers.dart ---
+// lib/features/auth/presentation/providers/auth_providers.dart
+
+import 'package:riverpod/riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+// هذا الـ Provider يراقب حالة المصادقة في Supabase
+final authStateProvider = StreamProvider<AuthState>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange;
+});
+
+// هذا الـ Provider يجلب بيانات AppUser للمستخدم المسجل دخوله حاليًا
+final currentUserProvider = FutureProvider<AppUser?>((ref) async {
+  // نراقب حالة المصادقة
+  final authState = ref.watch(authStateProvider);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+
+  // إذا كان هناك مستخدم مسجل دخوله، نجلب بياناته من جدول users
+  final user = authState.value?.session?.user;
+  if (user != null) {
+    return await supabaseService.getUserData(user.id);
+  }
+  return null;
+});
+
+
+--- FILE: lib/features/cart/presentation/pages/cart_screen.dart ---
+// lib/features/cart/presentation/pages/cart_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+import 'package:syria_store/features/cart/presentation/widgets/cart_list_item.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+class CartScreen extends ConsumerWidget {
+  const CartScreen({super.key});
+
+  // دالة لإرسال الطلب عبر واتساب، مستوحاة من مشروعك السابق
+  Future<void> _sendOrderViaWhatsApp(BuildContext context, WidgetRef ref) async {
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final dollarRate = ref.read(exchangeRateProvider);
+    // TODO: سنقوم بجلب بيانات المستخدم الحقيقي لاحقًا
+    final message = cartNotifier.getWhatsAppMessage(context, null, dollarRate);
+    final whatsappNumber = '963980756485'; // ضع الرقم الصحيح هنا
+    final url = 'https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}';
+
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      // تفريغ السلة بعد إرسال الطلب بنجاح 
+      cartNotifier.clearCart();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يمكن فتح واتساب. تأكد من أنه مثبت على جهازك.'))
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartItemsMap = ref.watch(cartProvider);
+    final cartItems = cartItemsMap.values.toList();
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final dollarRate = ref.watch(exchangeRateProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('عربة التسوق'),
+        actions: [
+          if (cartItems.isNotEmpty)
+            IconButton(
+              onPressed: () => cartNotifier.clearCart(),
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'تفريغ السلة',
+            )
+        ],
+      ),
+      body: cartItems.isEmpty
+          ? const Center( // واجهة السلة الفارغة
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey),
+                  SizedBox(height: 20),
+                  Text('سلتك فارغة!', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                  Text('ابدأ بإضافة المنتجات التي تعجبك', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: cartItems.length,
+                    itemBuilder: (context, index) {
+                      return CartListItem(cartItem: cartItems[index]);
+                    },
+                  ),
+                ),
+                Card(
+                  margin: const EdgeInsets.all(12),
+                  elevation: 5,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('المجموع:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text(
+                              '${cartNotifier.totalAmountSYP(dollarRate).toStringAsFixed(2)} ل.س',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                             Text(
+                              '(\$${cartNotifier.totalAmountUSD.toStringAsFixed(2)})',
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => _sendOrderViaWhatsApp(context, ref),
+                          style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                          child: const Text('إتمام الطلب عبر واتساب'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              ],
+            ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/cart/presentation/providers/cart_provider.dart ---
+// lib/features/cart/presentation/providers/cart_provider.dart
+
+import 'package:flutter/material.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:syria_store/core/models/models.dart';
+
+part 'cart_provider.g.dart';
+
+@riverpod
+class Cart extends _$Cart {
+  
+  @override
+  Map<String, CartItem> build() => {};
+
+  // --- دوال تعديل السلة ---
+  void addItem(Product product, {int quantity = 1}) {
+    final newState = {...state};
+    if (newState.containsKey(product.id)) {
+      newState[product.id]!.quantity += quantity;
+    } else {
+      newState[product.id] = CartItem(product: product, quantity: quantity);
+    }
+    state = newState;
+  }
+  void increaseQuantity(String productId) {
+    final newState = {...state};
+    if (newState.containsKey(productId)) {
+      newState[productId]!.quantity++;
+      state = newState;
+    }
+  }
+  void decreaseQuantity(String productId) {
+    final newState = {...state};
+    if (newState.containsKey(productId) && newState[productId]!.quantity > 1) {
+      newState[productId]!.quantity--;
+      state = newState;
+    } else {
+      removeItem(productId);
+    }
+  }
+  void removeItem(String productId) {
+    final newState = {...state};
+    newState.remove(productId);
+    state = newState;
+  }
+  void clearCart() => state = {};
+
+  // --- دوال حسابية وقيم مشتقة ---
+  int get totalItems => state.values.fold(0, (sum, item) => sum + item.quantity);
+
+  double get totalAmountUSD => state.values.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
+
+  // 
+  double totalAmountSYP(double dollarRate) => totalAmountUSD * dollarRate;
+
+  //
+  String getWhatsAppMessage(BuildContext context, AppUser? user, double dollarRate) {
+    final StringBuffer message = StringBuffer();
+    // سنضيف منطق الترجمة هنا لاحقًا
+    message.writeln('طلب جديد من تطبيق Syria Store!');
+    message.writeln('------------------------------------');
+    if (user != null) {
+      message.writeln('اسم العميل: ${user.name ?? 'غير معروف'}');
+      message.writeln('البريد الإلكتروني: ${user.email ?? 'غير متوفر'}');
+    }
+    message.writeln('------------------------------------');
+    message.writeln('تفاصيل الطلب:');
+
+    state.forEach((productId, item) {
+      final itemPriceSYP = item.product.price * item.quantity * dollarRate;
+      message.writeln('- ${item.product.getLocalizedName(context)} (x${item.quantity}) = ${itemPriceSYP.toStringAsFixed(2)} ل.س');
+    });
+    message.writeln('------------------------------------');
+    message.writeln('المجموع: ${totalAmountSYP(dollarRate).toStringAsFixed(2)} ل.س');
+    message.writeln('(ما يعادل ${totalAmountUSD.toStringAsFixed(2)} \$)');
+    message.writeln('\nشكراً لطلبك!');
+    return message.toString();
+  }
+}
+
+
+--- FILE: lib/features/cart/presentation/providers/cart_provider.g.dart ---
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'cart_provider.dart';
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+String _$cartHash() => r'1e7530cfcecad0eed6479ca7938f87bd801b546c';
+
+/// See also [Cart].
+@ProviderFor(Cart)
+final cartProvider =
+    AutoDisposeNotifierProvider<Cart, Map<String, CartItem>>.internal(
+      Cart.new,
+      name: r'cartProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$cartHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$Cart = AutoDisposeNotifier<Map<String, CartItem>>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+
+
+--- FILE: lib/features/cart/presentation/widgets/cart_list_item.dart ---
+// lib/features/cart/presentation/widgets/cart_list_item.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+
+class CartListItem extends ConsumerWidget {
+  const CartListItem({super.key, required this.cartItem});
+
+  final CartItem cartItem;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                cartItem.product.imageUrls.isNotEmpty ? cartItem.product.imageUrls.first : '',
+                width: 80, height: 80, fit: BoxFit.cover,
+                errorBuilder: (ctx, err, stack) => const Icon(Icons.image_not_supported, size: 80),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cartItem.product.getLocalizedName(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('\$${cartItem.product.price.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 14)),
+                ],
+              ),
+            ),
+            // أزرار التحكم بالكمية والحذف
+            Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => ref.read(cartProvider.notifier).decreaseQuantity(cartItem.product.id),
+                      icon: const Icon(Icons.remove_circle_outline, size: 22)
+                    ),
+                    Text('${cartItem.quantity}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      onPressed: () => ref.read(cartProvider.notifier).increaseQuantity(cartItem.product.id),
+                      icon: const Icon(Icons.add_circle_outline, size: 22)
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(cartProvider.notifier).removeItem(cartItem.product.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم حذف المنتج'), duration: Duration(seconds: 1))
+                    );
+                  },
+                  icon: Icon(Icons.delete_outline, color: Colors.red.shade700, size: 24),
+                  tooltip: 'حذف المنتج',
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/home/presentation/pages/home_page.dart ---
+// lib/features/home/presentation/pages/home_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/home/presentation/widgets/category_card.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+import 'package:syria_store/app/widgets/side_bar.dart'; // استيراد القائمة الجانبية
+
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bannersAsync = ref.watch(bannersProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final cartData = ref.watch(cartProvider);
+    final totalCartQuantity = cartData.values.fold(0, (previousValue, item) => previousValue + item.quantity);
+
+    return Scaffold(
+      // إضافة الـ drawer إلى الـ Scaffold
+      drawer: const SideBar(), 
+      appBar: AppBar(
+        title: const Text('Syria Store'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Badge(
+              label: Text('$totalCartQuantity'),
+              isLabelVisible: totalCartQuantity > 0,
+              backgroundColor: Theme.of(context).colorScheme.error,
+              child: IconButton(
+                onPressed: () => context.push('/cart'),
+                icon: const Icon(Icons.shopping_cart_outlined),
+                tooltip: 'عربة التسوق',
+              ),
+            ),
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bannersAsync.when(
+              data: (banners) {
+                if (banners.isEmpty) return const SizedBox.shrink();
+                return CarouselSlider.builder(
+                  itemCount: banners.length,
+                  itemBuilder: (context, index, realIndex) {
+                    final banner = banners[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.network(banner.imageUrl, fit: BoxFit.cover)),
+                    );
+                  },
+                  options: CarouselOptions(autoPlay: true, aspectRatio: 16 / 9, enlargeCenterPage: true, viewportFraction: 0.85, autoPlayInterval: const Duration(seconds: 4)),
+                );
+              },
+              error: (err, stack) => const SizedBox.shrink(),
+              loading: () => const Center(heightFactor: 5, child: CircularProgressIndicator()),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Text('الأقسام', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            ),
+            categoriesAsync.when(
+              data: (categories) {
+                if (categories.isEmpty) return const Center(child: Text('لا يوجد فئات لعرضها حاليًا.'));
+                return GridView.builder(
+                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(12.0),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12.0, mainAxisSpacing: 12.0, childAspectRatio: 0.9),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return CategoryCard(
+                      category: category,
+                      onTap: () {
+                        context.push('/category/${category.id}', extra: category.getLocalizedName(context));
+                      },
+                    );
+                  },
+                );
+              },
+              error: (error, stackTrace) => Center(child: Text('حدث خطأ في عرض الفئات: $error')),
+              loading: () => const Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/home/presentation/providers/home_providers.dart ---
+// lib/features/home/presentation/providers/home_providers.dart
+
+import 'package:riverpod/riverpod.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/core/services/supabase_service.dart';
+
+final supabaseServiceProvider = Provider<SupabaseService>((ref) {
+  return SupabaseService();
+});
+
+final categoriesProvider = FutureProvider<List<Category>>((ref) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getCategories();
+});
+
+final bannersProvider = FutureProvider<List<BannerAd>>((ref) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getBanners();
+});
+
+final productsByCategoryProvider = FutureProvider.family<List<Product>, String>((ref, categoryId) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getProductsByCategory(categoryId);
+});
+
+final productByIdProvider = FutureProvider.family<Product, String>((ref, productId) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getProductById(productId);
+});
+
+final exchangeRateProvider = StateProvider<double>((ref) => 14500.0);
+
+
+--- FILE: lib/features/home/presentation/widgets/category_card.dart ---
+// lib/features/home/presentation/widgets/category_card.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class CategoryCard extends StatelessWidget {
+  const CategoryCard({super.key, required this.category, required this.onTap});
+
+  final Category category;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      // استخدام ClipRRect لجعل الصورة تأخذ نفس شكل حواف البطاقة الدائرية
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 5,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            // صورة الفئة تملأ البطاقة بالكامل
+            Positioned.fill(
+              child: Image.network(
+                category.imageUrl,
+                fit: BoxFit.cover,
+                // إظهار مؤشر تحميل أثناء تحميل الصورة
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                // إظهار أيقونة خطأ في حال فشل تحميل الصورة
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.error, color: Colors.red),
+                  );
+                },
+              ),
+            ),
+            // طبقة سوداء شفافة في الأسفل لتحسين وضوح النص
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.8),
+                    Colors.black.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+            // اسم الفئة
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Text(
+                category.getLocalizedName(context),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 2.0,
+                      color: Colors.black,
+                      offset: Offset(1, 1),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/category_products_page.dart ---
+// lib/features/products/presentation/pages/category_products_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/products/presentation/widgets/product_card.dart';
+
+class CategoryProductsPage extends ConsumerWidget {
+  const CategoryProductsPage({super.key, required this.categoryId, required this.categoryName});
+
+  final String categoryId;
+  final String categoryName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // يجب أن يعمل هذا السطر الآن بدون مشاكل
+    final productsAsync = ref.watch(productsByCategoryProvider(categoryId));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(categoryName),
+      ),
+      body: productsAsync.when(
+        data: (products) {
+          if (products.isEmpty) {
+            return const Center(
+              child: Text('لا توجد منتجات في هذه الفئة بعد.'),
+            );
+          }
+          return GridView.builder(
+            padding: const EdgeInsets.all(12.0),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12.0,
+              mainAxisSpacing: 12.0,
+              childAspectRatio: 0.7,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              return ProductCard(
+                product: product,
+              );
+            },
+          );
+        },
+        error: (error, stack) => Center(child: Text('حدث خطأ: $error')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/product_details_page.dart ---
+// lib/features/products/presentation/pages/product_details_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart'; // استيراد الـ Provider الجديد
+
+class ProductDetailsPage extends ConsumerStatefulWidget {
+  const ProductDetailsPage({super.key, required this.productId});
+
+  final String productId;
+
+  @override
+  ConsumerState<ProductDetailsPage> createState() => _ProductDetailsPageState();
+}
+
+class _ProductDetailsPageState extends ConsumerState<ProductDetailsPage> {
+  late final PageController _pageController;
+  int _currentPage = 0;
+  int _quantity = 1; // حالة جديدة لتخزين الكمية المطلوبة
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pageController.addListener(() {
+      if (!mounted) return;
+      if (_pageController.page?.round() != _currentPage) {
+        setState(() {
+          _currentPage = _pageController.page!.round();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+  
+  Widget _buildDot(int index, int total) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+      height: 8.0,
+      width: _currentPage == index ? 24.0 : 8.0,
+      decoration: BoxDecoration(
+        color: _currentPage == index ? Theme.of(context).primaryColor : Colors.grey,
+        borderRadius: BorderRadius.circular(5),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productAsync = ref.watch(productByIdProvider(widget.productId));
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: productAsync.when(
+        data: (product) {
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (product.imageUrls.isNotEmpty)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(height: 300, child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: product.imageUrls.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.network(product.imageUrls[index], fit: BoxFit.cover)),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white70), onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn))),
+                      Positioned(right: 15, child: IconButton(icon: const Icon(Icons.arrow_forward_ios, color: Colors.white70), onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn))),
+                      Positioned(bottom: 10, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(product.imageUrls.length, (index) => _buildDot(index, product.imageUrls.length)))),
+                    ],
+                  ),
+                const SizedBox(height: 24),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(product.getLocalizedName(context), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text('\$${product.price.toStringAsFixed(2)}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      Text('الوصف', style: Theme.of(context).textTheme.titleLarge),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Text(product.getLocalizedDescription(context), style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5)),
+                      const SizedBox(height: 32),
+
+                      // --- قسم الكمية والإضافة للسلة ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('الكمية:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 20),
+                          IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () { if (_quantity > 1) setState(() => _quantity--); }),
+                          Text('$_quantity', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => setState(() => _quantity++)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          // استخدام ref.read للحصول على الـ notifier وتنفيذ الأمر
+                          ref.read(cartProvider.notifier).addItem(product, quantity: _quantity);
+                          
+                          // إظهار رسالة تأكيد للمستخدم
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('تم إضافة ${product.getLocalizedName(context)} (x$_quantity) إلى السلة بنجاح!'),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: Colors.green,
+                            )
+                          );
+                        },
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('إضافة إلى السلة'),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        error: (error, stack) => Center(child: Text('خطأ في تحميل المنتج: $error')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/widgets/product_card.dart ---
+// lib/features/products/presentation/widgets/product_card.dart
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart'; // استيراد go_router
+import 'package:syria_store/core/models/models.dart';
+
+class ProductCard extends StatelessWidget {
+  const ProductCard({
+    super.key,
+    required this.product,
+    // لا يوجد بارامتر onTap هنا، لأن الويدجت ستتعامل مع النقر بنفسها
+  });
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 3,
+      child: InkWell(
+        // --- منطق التنقل موجود هنا مباشرة ---
+        onTap: () {
+          // استخدام push للانتقال إلى صفحة المنتج مع تمرير الـ ID
+          context.push('/product/${product.id}');
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Hero(
+                tag: 'product_image_${product.id}',
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.grey.shade200,
+                  child: Image.network(
+                    product.imageUrls.isNotEmpty
+                        ? product.imageUrls.first
+                        : 'https://placehold.co/400x300?text=No+Image',
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(child: Icon(Icons.error));
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.getLocalizedName(context),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${product.price.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 16,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/splash/presentation/splash_page.dart ---
+import 'package:flutter/material.dart';import 'package:go_router/go_router.dart';
+class SplashPage extends StatefulWidget {const SplashPage({super.key}); @override State<SplashPage> createState() => _SplashPageState();}
+class _SplashPageState extends State<SplashPage> {@override void initState() {super.initState(); Future.delayed(const Duration(seconds: 1), () {if(mounted) context.go('/home');});} @override Widget build(BuildContext context) {return const Scaffold(body: Center(child: CircularProgressIndicator()));}}
+
+
+--- FILE: lib/main.dart ---
+// main.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/app/routes/app_router.dart';
+import 'package:syria_store/core/env/env.dart';
+import 'package:syria_store/core/theme/app_theme.dart'; // استيراد الثيم الجاهز
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
+  );
+
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Syria Store',
+      debugShowCheckedModeBanner: false,
+      
+      // استخدام الثيم من الملف المخصص
+      theme: AppTheme.lightTheme,
+      
+      routerConfig: goRouter,
+    );
+  }
+}
+
+
+--- FILE: test/widget_test.dart (Test File) ---
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:syria_store/main.dart';
+
+void main() {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+
+
+--- FILE: lib/core/models/models.dart ---
+// lib/core/models/models.dart
+
+import 'package:flutter/material.dart';
+// import 'package:my_store_app/l10n/app_localizations.dart'; // سنعيد تفعيله لاحقًا
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// يحدد نوع الوجهة التي يجب أن ينتقل إليها البانر عند النقر عليه.
+enum BannerTargetType {
+  product,   // يوجه إلى صفحة منتج معين
+  category,  // يوجه إلى صفحة فئة معينة
+  search,    // يوجه إلى نتائج بحث معينة
+  none,      // البانر غير قابل للنقر
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+/// نموذج بيانات الفئة (مثل: إلكترونيات، أزياء، مستلزمات المنزل).
+class Category {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String imageUrl; // صورة كبيرة للفئة
+  final String? parentCategoryId; // لدعم الفئات الفرعية مستقبلاً (e.g., 'ملابس' -> 'رجال')
+
+  Category({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.imageUrl,
+    this.parentCategoryId,
+  });
+
+  /// الحصول على الاسم المترجم بناءً على لغة التطبيق الحالية.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+}
+
+/// نموذج بيانات المنتج، مع إضافة حقول جديدة.
+class Product {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String productNumber;
+  final double price; // السعر بالدولار الأمريكي
+  final String descriptionAr;
+  final String descriptionEn;
+  final List<String> imageUrls; // قائمة بالصور لعرضها في معرض صور
+  final String categoryId; // لربط المنتج بالفئة التي ينتمي إليها
+  final String? brand; // ماركة المنتج (اختياري)
+  final List<String>? tags; // كلمات مفتاحية للبحث (اختياري)
+
+  Product({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.productNumber,
+    required this.price,
+    required this.descriptionAr,
+    required this.descriptionEn,
+    required this.imageUrls,
+    required this.categoryId,
+    this.brand,
+    this.tags,
+  });
+
+  /// الحصول على الاسم المترجم.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+
+  /// الحصول على الوصف المترجم.
+  String getLocalizedDescription(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? descriptionAr : descriptionEn;
+  }
+}
+
+/// نموذج بيانات البانر الإعلاني للشاشة الرئيسية.
+class BannerAd {
+  final String id;
+  final String imageUrl;
+  final BannerTargetType targetType; // نوع الوجهة
+  final String? targetId; // معرّف المنتج أو الفئة أو كلمة البحث
+
+  BannerAd({
+    required this.id,
+    required this.imageUrl,
+    this.targetType = BannerTargetType.none,
+    this.targetId,
+  });
+}
+
+/// نموذج بيانات المستخدم (كما هو من قبل، مع الحقول الأساسية).
+class AppUser {
+  final String uid;
+  final String? email;
+  final String? name;
+  final String? profileImageUrl;
+  final bool isAdmin;
+  final String? locale;
+  final String? address;
+
+  AppUser({
+    required this.uid,
+    this.email,
+    this.name,
+    this.profileImageUrl,
+    this.isAdmin = false,
+    this.locale,
+    this.address,
+  });
+}
+
+
+/// نموذج بيانات عنصر السلة (كما هو من قبل).
+class CartItem {
+  final Product product;
+  int quantity;
+
+  CartItem({required this.product, this.quantity = 1});
+}
+
+
+--- FILE: lib/core/models/rive_model.dart ---
+// lib/core/models/rive_model.dart
+
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
+
+class RiveUtils {
+  static StateMachineController getRiveController(Artboard artboard, {String? stateMachineName}) {
+    StateMachineController? controller = StateMachineController.fromArtboard(artboard, stateMachineName ?? 'State Machine 1');
+    if (controller == null) {
+      throw Exception('Could not find Rive StateMachineController');
+    }
+    artboard.addController(controller);
+    return controller;
+  }
+}
+
+class RiveModel {
+  final String src;
+  final String artboard;
+  final String stateMachineName;
+  final String title;
+  late SMIBool? input;
+
+  RiveModel({
+    required this.src,
+    required this.artboard,
+    required this.stateMachineName,
+    required this.title,
+  });
+
+  set setInput(SMIBool status) {
+    input = status;
+  }
+}
+
+
+--- FILE: lib/core/services/supabase_service.dart ---
+// lib/core/services/supabase_service.dart
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class SupabaseService {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  // --- الدالة الجديدة ---
+  /// جلب بيانات AppUser من جدول users باستخدام uid
+  Future<AppUser?> getUserData(String uid) async {
+    try {
+      final data = await _client.from('users').select().eq('id', uid).single();
+      // تحويل الـ Map إلى كائن AppUser
+      return AppUser(
+        uid: data['id'],
+        email: data['email'],
+        name: data['name'],
+        profileImageUrl: data['profile_image_url'],
+        isAdmin: data['is_admin'] ?? false,
+        locale: data['locale'],
+        address: data['address'],
+      );
+    } catch (e) {
+      // قد لا يكون المستخدم موجودًا في جدولنا بعد، أو قد يحدث خطأ
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+  // --- نهاية الدالة الجديدة ---
+  
+  Future<Product> getProductById(String productId) async {
+    try {
+      final response = await _client.from('products').select().eq('id', productId).single();
+      return Product(
+        id: response['id'].toString(), nameAr: response['name_ar'], nameEn: response['name_en'],
+        productNumber: response['product_number'], price: (response['price'] as num).toDouble(),
+        descriptionAr: response['description_ar'], descriptionEn: response['description_en'],
+        imageUrls: List<String>.from(response['image_urls']), categoryId: response['category_id'].toString(),
+        brand: response['brand'], tags: List<String>.from(response['tags'] ?? []),
+      );
+    } catch (e) {
+      print('Error getting product by ID from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _client.from('products').select().eq('category_id', categoryId);
+      return response.map((item) => Product(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        productNumber: item['product_number'], price: (item['price'] as num).toDouble(),
+        descriptionAr: item['description_ar'], descriptionEn: item['description_en'],
+        imageUrls: List<String>.from(item['image_urls']), categoryId: item['category_id'].toString(),
+        brand: item['brand'], tags: List<String>.from(item['tags'] ?? []),
+      )).toList();
+    } catch (e) {
+      print('Error getting products by category from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Category>> getCategories() async {
+    try {
+      final response = await _client.from('categories').select();
+      return response.map((item) => Category(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        imageUrl: item['image_url'], parentCategoryId: item['parent_category_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting categories from Supabase: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<BannerAd>> getBanners() async {
+    try {
+      final response = await _client.from('banners').select();
+      return response.map((item) => BannerAd(
+        id: item['id'].toString(), imageUrl: item['image_url'],
+        targetType: BannerTargetType.values.byName(item['target_type'] ?? 'none'),
+        targetId: item['target_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting banners from Supabase: $e');
+      rethrow;
+    }
+  }
+}
+
+
+--- FILE: lib/core/theme/app_colors.dart ---
+// lib/core/theme/app_colors.dart
+
+import 'package:flutter/material.dart';
+
+class AppColors {
+  // --- لوحة الألوان الجديدة ---
+  static const Color primary = Color(0xFF0D47A1);   // أزرق داكن وأنيق
+  static const Color secondary = Color(0xFF00BCD4);  // سماوي/تركواز حيوي
+  
+  // ألوان الخلفيات والأسطح
+  static const Color background = Color(0xFFF4F6F8); // رمادي فاتح جدًا ومريح
+  static const Color surface = Colors.white;
+
+  // ألوان النصوص
+  static const Color textPrimary = Color(0xFF1A2536); // أسود غير حاد
+  static const Color textSecondary = Color(0xFF707070); // رمادي للنصوص الثانوية
+
+  // ألوان أخرى
+  static const Color error = Color(0xFFD32F2F);
+  static const Color success = Color(0xFF388E3C);
+  static const Color white = Colors.white;
+}
+
+
+--- FILE: lib/core/theme/app_theme.dart ---
+// lib/core/theme/app_theme.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/theme/app_colors.dart';
+
+class AppTheme {
+  static final ThemeData lightTheme = ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Poppins',
+    primaryColor: AppColors.primary,
+    scaffoldBackgroundColor: AppColors.background,
+
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      primary: AppColors.primary,
+      secondary: AppColors.secondary,
+      background: AppColors.background,
+      surface: AppColors.surface,
+      error: AppColors.error,
+      brightness: Brightness.light,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      elevation: 1.0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600),
+    ),
+
+    cardTheme: CardThemeData(
+      elevation: 1.0,
+      shadowColor: Colors.black12,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+      ),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    ),
+
+    textTheme: const TextTheme(
+      headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      bodyLarge: TextStyle(color: AppColors.textPrimary, height: 1.5),
+      bodyMedium: TextStyle(color: AppColors.textSecondary),
+    ),
+  );
+}
+
+
+--- FILE: lib/features/admin/presentation/pages/admin_panel_page.dart ---
+// lib/features/admin/presentation/pages/admin_panel_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class AdminPanelPage extends ConsumerWidget {
+  const AdminPanelPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة تحكم المسؤول'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // قائمة بالوظائف الإدارية
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined),
+            title: const Text('إدارة المنتجات'),
+            subtitle: const Text('إضافة، تعديل، وحذف المنتجات'),
+            onTap: () {
+              // TODO: Navigate to Manage Products screen
+              print('Navigate to Manage Products');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('إدارة الفئات'),
+            subtitle: const Text('إضافة، تعديل، وحذف الفئات'),
+            onTap: () {
+              // TODO: Navigate to Manage Categories screen
+              print('Navigate to Manage Categories');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.view_carousel_outlined),
+            title: const Text('إدارة البانرات'),
+            subtitle: const Text('إضافة، تعديل، وحذف البانرات الإعلانية'),
+            onTap: () {
+              // TODO: Navigate to Manage Banners screen
+              print('Navigate to Manage Banners');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/auth/presentation/providers/auth_providers.dart ---
+// lib/features/auth/presentation/providers/auth_providers.dart
+
+import 'package:riverpod/riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+// هذا الـ Provider يراقب حالة المصادقة في Supabase
+final authStateProvider = StreamProvider<AuthState>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange;
+});
+
+// هذا الـ Provider يجلب بيانات AppUser للمستخدم المسجل دخوله حاليًا
+final currentUserProvider = FutureProvider<AppUser?>((ref) async {
+  // نراقب حالة المصادقة
+  final authState = ref.watch(authStateProvider);
+  final supabaseService = ref.watch(supabaseServiceProvider);
+
+  // إذا كان هناك مستخدم مسجل دخوله، نجلب بياناته من جدول users
+  final user = authState.value?.session?.user;
+  if (user != null) {
+    return await supabaseService.getUserData(user.id);
+  }
+  return null;
+});
+
+
+--- FILE: lib/features/cart/presentation/pages/cart_screen.dart ---
+// lib/features/cart/presentation/pages/cart_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+import 'package:syria_store/features/cart/presentation/widgets/cart_list_item.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+class CartScreen extends ConsumerWidget {
+  const CartScreen({super.key});
+
+  // دالة لإرسال الطلب عبر واتساب، مستوحاة من مشروعك السابق
+  Future<void> _sendOrderViaWhatsApp(BuildContext context, WidgetRef ref) async {
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final dollarRate = ref.read(exchangeRateProvider);
+    // TODO: سنقوم بجلب بيانات المستخدم الحقيقي لاحقًا
+    final message = cartNotifier.getWhatsAppMessage(context, null, dollarRate);
+    final whatsappNumber = '963980756485'; // ضع الرقم الصحيح هنا
+    final url = 'https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}';
+
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      // تفريغ السلة بعد إرسال الطلب بنجاح 
+      cartNotifier.clearCart();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يمكن فتح واتساب. تأكد من أنه مثبت على جهازك.'))
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartItemsMap = ref.watch(cartProvider);
+    final cartItems = cartItemsMap.values.toList();
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final dollarRate = ref.watch(exchangeRateProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('عربة التسوق'),
+        actions: [
+          if (cartItems.isNotEmpty)
+            IconButton(
+              onPressed: () => cartNotifier.clearCart(),
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'تفريغ السلة',
+            )
+        ],
+      ),
+      body: cartItems.isEmpty
+          ? const Center( // واجهة السلة الفارغة
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey),
+                  SizedBox(height: 20),
+                  Text('سلتك فارغة!', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                  Text('ابدأ بإضافة المنتجات التي تعجبك', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: cartItems.length,
+                    itemBuilder: (context, index) {
+                      return CartListItem(cartItem: cartItems[index]);
+                    },
+                  ),
+                ),
+                Card(
+                  margin: const EdgeInsets.all(12),
+                  elevation: 5,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('المجموع:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text(
+                              '${cartNotifier.totalAmountSYP(dollarRate).toStringAsFixed(2)} ل.س',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                             Text(
+                              '(\$${cartNotifier.totalAmountUSD.toStringAsFixed(2)})',
+                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => _sendOrderViaWhatsApp(context, ref),
+                          style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                          child: const Text('إتمام الطلب عبر واتساب'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              ],
+            ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/cart/presentation/providers/cart_provider.dart ---
+// lib/features/cart/presentation/providers/cart_provider.dart
+
+import 'package:flutter/material.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:syria_store/core/models/models.dart';
+
+part 'cart_provider.g.dart';
+
+@riverpod
+class Cart extends _$Cart {
+  
+  @override
+  Map<String, CartItem> build() => {};
+
+  // --- دوال تعديل السلة ---
+  void addItem(Product product, {int quantity = 1}) {
+    final newState = {...state};
+    if (newState.containsKey(product.id)) {
+      newState[product.id]!.quantity += quantity;
+    } else {
+      newState[product.id] = CartItem(product: product, quantity: quantity);
+    }
+    state = newState;
+  }
+  void increaseQuantity(String productId) {
+    final newState = {...state};
+    if (newState.containsKey(productId)) {
+      newState[productId]!.quantity++;
+      state = newState;
+    }
+  }
+  void decreaseQuantity(String productId) {
+    final newState = {...state};
+    if (newState.containsKey(productId) && newState[productId]!.quantity > 1) {
+      newState[productId]!.quantity--;
+      state = newState;
+    } else {
+      removeItem(productId);
+    }
+  }
+  void removeItem(String productId) {
+    final newState = {...state};
+    newState.remove(productId);
+    state = newState;
+  }
+  void clearCart() => state = {};
+
+  // --- دوال حسابية وقيم مشتقة ---
+  int get totalItems => state.values.fold(0, (sum, item) => sum + item.quantity);
+
+  double get totalAmountUSD => state.values.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
+
+  // 
+  double totalAmountSYP(double dollarRate) => totalAmountUSD * dollarRate;
+
+  //
+  String getWhatsAppMessage(BuildContext context, AppUser? user, double dollarRate) {
+    final StringBuffer message = StringBuffer();
+    // سنضيف منطق الترجمة هنا لاحقًا
+    message.writeln('طلب جديد من تطبيق Syria Store!');
+    message.writeln('------------------------------------');
+    if (user != null) {
+      message.writeln('اسم العميل: ${user.name ?? 'غير معروف'}');
+      message.writeln('البريد الإلكتروني: ${user.email ?? 'غير متوفر'}');
+    }
+    message.writeln('------------------------------------');
+    message.writeln('تفاصيل الطلب:');
+
+    state.forEach((productId, item) {
+      final itemPriceSYP = item.product.price * item.quantity * dollarRate;
+      message.writeln('- ${item.product.getLocalizedName(context)} (x${item.quantity}) = ${itemPriceSYP.toStringAsFixed(2)} ل.س');
+    });
+    message.writeln('------------------------------------');
+    message.writeln('المجموع: ${totalAmountSYP(dollarRate).toStringAsFixed(2)} ل.س');
+    message.writeln('(ما يعادل ${totalAmountUSD.toStringAsFixed(2)} \$)');
+    message.writeln('\nشكراً لطلبك!');
+    return message.toString();
+  }
+}
+
+
+--- FILE: lib/features/cart/presentation/providers/cart_provider.g.dart ---
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'cart_provider.dart';
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+String _$cartHash() => r'1e7530cfcecad0eed6479ca7938f87bd801b546c';
+
+/// See also [Cart].
+@ProviderFor(Cart)
+final cartProvider =
+    AutoDisposeNotifierProvider<Cart, Map<String, CartItem>>.internal(
+      Cart.new,
+      name: r'cartProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$cartHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$Cart = AutoDisposeNotifier<Map<String, CartItem>>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+
+
+--- FILE: lib/features/cart/presentation/widgets/cart_list_item.dart ---
+// lib/features/cart/presentation/widgets/cart_list_item.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+
+class CartListItem extends ConsumerWidget {
+  const CartListItem({super.key, required this.cartItem});
+
+  final CartItem cartItem;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                cartItem.product.imageUrls.isNotEmpty ? cartItem.product.imageUrls.first : '',
+                width: 80, height: 80, fit: BoxFit.cover,
+                errorBuilder: (ctx, err, stack) => const Icon(Icons.image_not_supported, size: 80),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cartItem.product.getLocalizedName(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text('\$${cartItem.product.price.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 14)),
+                ],
+              ),
+            ),
+            // أزرار التحكم بالكمية والحذف
+            Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => ref.read(cartProvider.notifier).decreaseQuantity(cartItem.product.id),
+                      icon: const Icon(Icons.remove_circle_outline, size: 22)
+                    ),
+                    Text('${cartItem.quantity}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      onPressed: () => ref.read(cartProvider.notifier).increaseQuantity(cartItem.product.id),
+                      icon: const Icon(Icons.add_circle_outline, size: 22)
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(cartProvider.notifier).removeItem(cartItem.product.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم حذف المنتج'), duration: Duration(seconds: 1))
+                    );
+                  },
+                  icon: Icon(Icons.delete_outline, color: Colors.red.shade700, size: 24),
+                  tooltip: 'حذف المنتج',
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/home/presentation/pages/home_page.dart ---
+// lib/features/home/presentation/pages/home_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/home/presentation/widgets/category_card.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart';
+import 'package:syria_store/app/widgets/side_bar.dart'; // استيراد القائمة الجانبية
+
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bannersAsync = ref.watch(bannersProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final cartData = ref.watch(cartProvider);
+    final totalCartQuantity = cartData.values.fold(0, (previousValue, item) => previousValue + item.quantity);
+
+    return Scaffold(
+      // إضافة الـ drawer إلى الـ Scaffold
+      drawer: const SideBar(), 
+      appBar: AppBar(
+        title: const Text('Syria Store'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Badge(
+              label: Text('$totalCartQuantity'),
+              isLabelVisible: totalCartQuantity > 0,
+              backgroundColor: Theme.of(context).colorScheme.error,
+              child: IconButton(
+                onPressed: () => context.push('/cart'),
+                icon: const Icon(Icons.shopping_cart_outlined),
+                tooltip: 'عربة التسوق',
+              ),
+            ),
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bannersAsync.when(
+              data: (banners) {
+                if (banners.isEmpty) return const SizedBox.shrink();
+                return CarouselSlider.builder(
+                  itemCount: banners.length,
+                  itemBuilder: (context, index, realIndex) {
+                    final banner = banners[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.network(banner.imageUrl, fit: BoxFit.cover)),
+                    );
+                  },
+                  options: CarouselOptions(autoPlay: true, aspectRatio: 16 / 9, enlargeCenterPage: true, viewportFraction: 0.85, autoPlayInterval: const Duration(seconds: 4)),
+                );
+              },
+              error: (err, stack) => const SizedBox.shrink(),
+              loading: () => const Center(heightFactor: 5, child: CircularProgressIndicator()),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Text('الأقسام', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            ),
+            categoriesAsync.when(
+              data: (categories) {
+                if (categories.isEmpty) return const Center(child: Text('لا يوجد فئات لعرضها حاليًا.'));
+                return GridView.builder(
+                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(12.0),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12.0, mainAxisSpacing: 12.0, childAspectRatio: 0.9),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return CategoryCard(
+                      category: category,
+                      onTap: () {
+                        context.push('/category/${category.id}', extra: category.getLocalizedName(context));
+                      },
+                    );
+                  },
+                );
+              },
+              error: (error, stackTrace) => Center(child: Text('حدث خطأ في عرض الفئات: $error')),
+              loading: () => const Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/home/presentation/providers/home_providers.dart ---
+// lib/features/home/presentation/providers/home_providers.dart
+
+import 'package:riverpod/riverpod.dart';
+import 'package:syria_store/core/models/models.dart';
+import 'package:syria_store/core/services/supabase_service.dart';
+
+final supabaseServiceProvider = Provider<SupabaseService>((ref) {
+  return SupabaseService();
+});
+
+final categoriesProvider = FutureProvider<List<Category>>((ref) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getCategories();
+});
+
+final bannersProvider = FutureProvider<List<BannerAd>>((ref) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getBanners();
+});
+
+final productsByCategoryProvider = FutureProvider.family<List<Product>, String>((ref, categoryId) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getProductsByCategory(categoryId);
+});
+
+final productByIdProvider = FutureProvider.family<Product, String>((ref, productId) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return supabaseService.getProductById(productId);
+});
+
+final exchangeRateProvider = StateProvider<double>((ref) => 14500.0);
+
+
+--- FILE: lib/features/home/presentation/widgets/category_card.dart ---
+// lib/features/home/presentation/widgets/category_card.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class CategoryCard extends StatelessWidget {
+  const CategoryCard({super.key, required this.category, required this.onTap});
+
+  final Category category;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      // استخدام ClipRRect لجعل الصورة تأخذ نفس شكل حواف البطاقة الدائرية
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 5,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            // صورة الفئة تملأ البطاقة بالكامل
+            Positioned.fill(
+              child: Image.network(
+                category.imageUrl,
+                fit: BoxFit.cover,
+                // إظهار مؤشر تحميل أثناء تحميل الصورة
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                // إظهار أيقونة خطأ في حال فشل تحميل الصورة
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.error, color: Colors.red),
+                  );
+                },
+              ),
+            ),
+            // طبقة سوداء شفافة في الأسفل لتحسين وضوح النص
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.8),
+                    Colors.black.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+            // اسم الفئة
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Text(
+                category.getLocalizedName(context),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 2.0,
+                      color: Colors.black,
+                      offset: Offset(1, 1),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/category_products_page.dart ---
+// lib/features/products/presentation/pages/category_products_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/products/presentation/widgets/product_card.dart';
+
+class CategoryProductsPage extends ConsumerWidget {
+  const CategoryProductsPage({super.key, required this.categoryId, required this.categoryName});
+
+  final String categoryId;
+  final String categoryName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // يجب أن يعمل هذا السطر الآن بدون مشاكل
+    final productsAsync = ref.watch(productsByCategoryProvider(categoryId));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(categoryName),
+      ),
+      body: productsAsync.when(
+        data: (products) {
+          if (products.isEmpty) {
+            return const Center(
+              child: Text('لا توجد منتجات في هذه الفئة بعد.'),
+            );
+          }
+          return GridView.builder(
+            padding: const EdgeInsets.all(12.0),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12.0,
+              mainAxisSpacing: 12.0,
+              childAspectRatio: 0.7,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              return ProductCard(
+                product: product,
+              );
+            },
+          );
+        },
+        error: (error, stack) => Center(child: Text('حدث خطأ: $error')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/product_details_page.dart ---
+// lib/features/products/presentation/pages/product_details_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+import 'package:syria_store/features/cart/presentation/providers/cart_provider.dart'; // استيراد الـ Provider الجديد
+
+class ProductDetailsPage extends ConsumerStatefulWidget {
+  const ProductDetailsPage({super.key, required this.productId});
+
+  final String productId;
+
+  @override
+  ConsumerState<ProductDetailsPage> createState() => _ProductDetailsPageState();
+}
+
+class _ProductDetailsPageState extends ConsumerState<ProductDetailsPage> {
+  late final PageController _pageController;
+  int _currentPage = 0;
+  int _quantity = 1; // حالة جديدة لتخزين الكمية المطلوبة
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pageController.addListener(() {
+      if (!mounted) return;
+      if (_pageController.page?.round() != _currentPage) {
+        setState(() {
+          _currentPage = _pageController.page!.round();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+  
+  Widget _buildDot(int index, int total) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+      height: 8.0,
+      width: _currentPage == index ? 24.0 : 8.0,
+      decoration: BoxDecoration(
+        color: _currentPage == index ? Theme.of(context).primaryColor : Colors.grey,
+        borderRadius: BorderRadius.circular(5),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productAsync = ref.watch(productByIdProvider(widget.productId));
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: productAsync.when(
+        data: (product) {
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (product.imageUrls.isNotEmpty)
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(height: 300, child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: product.imageUrls.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.network(product.imageUrls[index], fit: BoxFit.cover)),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white70), onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn))),
+                      Positioned(right: 15, child: IconButton(icon: const Icon(Icons.arrow_forward_ios, color: Colors.white70), onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn))),
+                      Positioned(bottom: 10, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(product.imageUrls.length, (index) => _buildDot(index, product.imageUrls.length)))),
+                    ],
+                  ),
+                const SizedBox(height: 24),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(product.getLocalizedName(context), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text('\$${product.price.toStringAsFixed(2)}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      Text('الوصف', style: Theme.of(context).textTheme.titleLarge),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Text(product.getLocalizedDescription(context), style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5)),
+                      const SizedBox(height: 32),
+
+                      // --- قسم الكمية والإضافة للسلة ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('الكمية:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 20),
+                          IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () { if (_quantity > 1) setState(() => _quantity--); }),
+                          Text('$_quantity', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => setState(() => _quantity++)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          // استخدام ref.read للحصول على الـ notifier وتنفيذ الأمر
+                          ref.read(cartProvider.notifier).addItem(product, quantity: _quantity);
+                          
+                          // إظهار رسالة تأكيد للمستخدم
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('تم إضافة ${product.getLocalizedName(context)} (x$_quantity) إلى السلة بنجاح!'),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: Colors.green,
+                            )
+                          );
+                        },
+                        icon: const Icon(Icons.add_shopping_cart),
+                        label: const Text('إضافة إلى السلة'),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        error: (error, stack) => Center(child: Text('خطأ في تحميل المنتج: $error')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/widgets/product_card.dart ---
+// lib/features/products/presentation/widgets/product_card.dart
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart'; // استيراد go_router
+import 'package:syria_store/core/models/models.dart';
+
+class ProductCard extends StatelessWidget {
+  const ProductCard({
+    super.key,
+    required this.product,
+    // لا يوجد بارامتر onTap هنا، لأن الويدجت ستتعامل مع النقر بنفسها
+  });
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 3,
+      child: InkWell(
+        // --- منطق التنقل موجود هنا مباشرة ---
+        onTap: () {
+          // استخدام push للانتقال إلى صفحة المنتج مع تمرير الـ ID
+          context.push('/product/${product.id}');
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Hero(
+                tag: 'product_image_${product.id}',
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.grey.shade200,
+                  child: Image.network(
+                    product.imageUrls.isNotEmpty
+                        ? product.imageUrls.first
+                        : 'https://placehold.co/400x300?text=No+Image',
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(child: Icon(Icons.error));
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.getLocalizedName(context),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${product.price.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 16,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/splash/presentation/splash_page.dart ---
+import 'package:flutter/material.dart';import 'package:go_router/go_router.dart';
+class SplashPage extends StatefulWidget {const SplashPage({super.key}); @override State<SplashPage> createState() => _SplashPageState();}
+class _SplashPageState extends State<SplashPage> {@override void initState() {super.initState(); Future.delayed(const Duration(seconds: 1), () {if(mounted) context.go('/home');});} @override Widget build(BuildContext context) {return const Scaffold(body: Center(child: CircularProgressIndicator()));}}
+
+
+--- FILE: lib/features/suppliers/data/models/supplier_agreement_model.dart ---
+// lib/features/suppliers/data/models/supplier_agreement_model.dart
+class SupplierAgreement {
+  final String id;
+  final String supplierName;
+  final String agreementDetails;
+  final double totalAmount;
+  final DateTime expectedDeliveryDate;
+  final String status;
+
+  SupplierAgreement({
+    required this.id,
+    required this.supplierName,
+    required this.agreementDetails,
+    required this.totalAmount,
+    required this.expectedDeliveryDate,
+    required this.status,
+  });
+
+  factory SupplierAgreement.fromJson(Map<String, dynamic> json) {
+    return SupplierAgreement(
+      id: json['id'],
+      // نفترض أن اسم المورد سيأتي من خلال علاقة في الاستعلام
+      supplierName: json['suppliers'] != null ? json['suppliers']['name'] : 'غير محدد',
+      agreementDetails: json['agreement_details'],
+      totalAmount: double.parse(json['total_amount'].toString()),
+      expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']),
+      status: json['status'],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/pages/supplier_agreements_page.dart ---
+// lib/features/suppliers/presentation/pages/supplier_agreements_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_providers.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/agreement_card.dart';
+
+class SupplierAgreementsPage extends ConsumerWidget {
+  const SupplierAgreementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agreementsAsync = ref.watch(agreementsProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('اتفاقيات الموردين'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // TODO: Navigate to Add Agreement Page
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'إضافة اتفاقية جديدة',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // شريط البحث والفلترة (سنضيف وظائفه لاحقًا)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'ابحث عن مورد أو اتفاقية...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade200,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20)
+              ),
+            ),
+          ),
+          // قائمة الاتفاقيات
+          Expanded(
+            child: agreementsAsync.when(
+              data: (agreements) {
+                if (agreements.isEmpty) {
+                  return const Center(child: Text('لا توجد اتفاقيات لعرضها حاليًا.'));
+                }
+                return ListView.builder(
+                  itemCount: agreements.length,
+                  itemBuilder: (context, index) {
+                    return AgreementCard(agreement: agreements[index]);
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('حدث خطأ: \${err.toString()}')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/providers/supplier_providers.dart ---
+// lib/features/suppliers/presentation/providers/supplier_providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+
+final supabase = Supabase.instance.client;
+
+// Provider لجلب قائمة الاتفاقيات مرتبة حسب تاريخ التسليم الأقرب
+final agreementsProvider = FutureProvider<List<SupplierAgreement>>((ref) async {
+  
+  // الاستعلام لجلب الاتفاقيات مع اسم المورد المرتبط بها
+  final response = await supabase
+      .from('supplier_agreements')
+      .select('*, suppliers(name)') // <-- جلب اسم المورد من جدول الموردين
+      .order('expected_delivery_date', ascending: true); // <-- الترتيب حسب تاريخ التسليم
+
+  final List<SupplierAgreement> agreements = [];
+  for (var item in response) {
+    agreements.add(SupplierAgreement.fromJson(item));
+  }
+  return agreements;
+});
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/agreement_card.dart ---
+// lib/features/suppliers/presentation/widgets/agreement_card.dart
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // ستحتاج لإضافة intl: ^0.19.0 في pubspec.yaml
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+
+class AgreementCard extends StatelessWidget {
+  final SupplierAgreement agreement;
+  const AgreementCard({super.key, required this.agreement});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final daysRemaining = agreement.expectedDeliveryDate.difference(DateTime.now()).inDays;
+    
+    // تحديد اللون والأيقونة بناءً على الحالة
+    final Map<String, dynamic> statusInfo = _getStatusInfo(agreement.status, theme);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 4,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          // TODO: Navigate to agreement details page
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    agreement.supplierName,
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusInfo['color'].withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(statusInfo['icon'], color: statusInfo['color'], size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          statusInfo['text'],
+                          style: TextStyle(color: statusInfo['color'], fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Text(
+                agreement.agreementDetails,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildInfoChip(
+                    theme,
+                    Icons.calendar_today_outlined,
+                    DateFormat('yyyy/MM/dd', 'ar').format(agreement.expectedDeliveryDate),
+                  ),
+                  if (daysRemaining >= 0 && agreement.status == 'pending_delivery')
+                    _buildInfoChip(
+                      theme,
+                      Icons.hourglass_top_outlined,
+                      'باقي \$daysRemaining يوم',
+                      color: theme.colorScheme.primary,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // دالة مساعدة لتحديد معلومات الحالة
+  Map<String, dynamic> _getStatusInfo(String status, ThemeData theme) {
+    switch (status) {
+      case 'pending_delivery':
+        return {'color': Colors.orange.shade700, 'icon': Icons.hourglass_top, 'text': 'قيد التسليم'};
+      case 'completed':
+        return {'color': Colors.green.shade700, 'icon': Icons.check_circle, 'text': 'مكتمل'};
+      case 'delayed':
+        return {'color': Colors.red.shade700, 'icon': Icons.error, 'text': 'متأخر'};
+      case 'cancelled':
+        return {'color': Colors.grey.shade700, 'icon': Icons.cancel, 'text': 'ملغي'};
+      default:
+        return {'color': Colors.grey, 'icon': Icons.help, 'text': 'غير معروف'};
+    }
+  }
+
+  // دالة مساعدة لإنشاء عناصر معلومات
+  Widget _buildInfoChip(ThemeData theme, IconData icon, String label, {Color? color}) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color ?? theme.textTheme.bodySmall?.color),
+        const SizedBox(width: 6),
+        Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: color, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/main.dart ---
+// main.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/app/routes/app_router.dart';
+import 'package:syria_store/core/env/env.dart';
+import 'package:syria_store/core/theme/app_theme.dart'; // استيراد الثيم الجاهز
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
+  );
+
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Syria Store',
+      debugShowCheckedModeBanner: false,
+
+      // استخدام الثيم من الملف المخصص
+      theme: AppTheme.lightTheme,
+
+      routerConfig: goRouter,
+    );
+  }
+}
+
+
+--- FILE: test/widget_test.dart (Test File) ---
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:syria_store/main.dart';
+
+void main() {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+
+
+--- FILE: lib/core/models/models.dart ---
+// lib/core/models/models.dart
+
+import 'package:flutter/material.dart';
+// import 'package:my_store_app/l10n/app_localizations.dart'; // سنعيد تفعيله لاحقًا
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// يحدد نوع الوجهة التي يجب أن ينتقل إليها البانر عند النقر عليه.
+enum BannerTargetType {
+  product,   // يوجه إلى صفحة منتج معين
+  category,  // يوجه إلى صفحة فئة معينة
+  search,    // يوجه إلى نتائج بحث معينة
+  none,      // البانر غير قابل للنقر
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+/// نموذج بيانات الفئة (مثل: إلكترونيات، أزياء، مستلزمات المنزل).
+class Category {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String imageUrl; // صورة كبيرة للفئة
+  final String? parentCategoryId; // لدعم الفئات الفرعية مستقبلاً (e.g., 'ملابس' -> 'رجال')
+
+  Category({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.imageUrl,
+    this.parentCategoryId,
+  });
+
+  /// الحصول على الاسم المترجم بناءً على لغة التطبيق الحالية.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+}
+
+/// نموذج بيانات المنتج، مع إضافة حقول جديدة.
+class Product {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String productNumber;
+  final double price; // السعر بالدولار الأمريكي
+  final String descriptionAr;
+  final String descriptionEn;
+  final List<String> imageUrls; // قائمة بالصور لعرضها في معرض صور
+  final String categoryId; // لربط المنتج بالفئة التي ينتمي إليها
+  final String? brand; // ماركة المنتج (اختياري)
+  final List<String>? tags; // كلمات مفتاحية للبحث (اختياري)
+
+  Product({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.productNumber,
+    required this.price,
+    required this.descriptionAr,
+    required this.descriptionEn,
+    required this.imageUrls,
+    required this.categoryId,
+    this.brand,
+    this.tags,
+  });
+
+  /// الحصول على الاسم المترجم.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+
+  /// الحصول على الوصف المترجم.
+  String getLocalizedDescription(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? descriptionAr : descriptionEn;
+  }
+}
+
+/// نموذج بيانات البانر الإعلاني للشاشة الرئيسية.
+class BannerAd {
+  final String id;
+  final String imageUrl;
+  final BannerTargetType targetType; // نوع الوجهة
+  final String? targetId; // معرّف المنتج أو الفئة أو كلمة البحث
+
+  BannerAd({
+    required this.id,
+    required this.imageUrl,
+    this.targetType = BannerTargetType.none,
+    this.targetId,
+  });
+}
+
+/// نموذج بيانات المستخدم (كما هو من قبل، مع الحقول الأساسية).
+class AppUser {
+  final String uid;
+  final String? email;
+  final String? name;
+  final String? profileImageUrl;
+  final bool isAdmin;
+  final String? locale;
+  final String? address;
+
+  AppUser({
+    required this.uid,
+    this.email,
+    this.name,
+    this.profileImageUrl,
+    this.isAdmin = false,
+    this.locale,
+    this.address,
+  });
+}
+
+
+/// نموذج بيانات عنصر السلة (كما هو من قبل).
+class CartItem {
+  final Product product;
+  int quantity;
+
+  CartItem({required this.product, this.quantity = 1});
+}
+
+
+--- FILE: lib/core/models/rive_model.dart ---
+// lib/core/models/rive_model.dart
+
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
+
+class RiveUtils {
+  static StateMachineController getRiveController(Artboard artboard, {String? stateMachineName}) {
+    StateMachineController? controller = StateMachineController.fromArtboard(artboard, stateMachineName ?? 'State Machine 1');
+    if (controller == null) {
+      throw Exception('Could not find Rive StateMachineController');
+    }
+    artboard.addController(controller);
+    return controller;
+  }
+}
+
+class RiveModel {
+  final String src;
+  final String artboard;
+  final String stateMachineName;
+  final String title;
+  late SMIBool? input;
+
+  RiveModel({
+    required this.src,
+    required this.artboard,
+    required this.stateMachineName,
+    required this.title,
+  });
+
+  set setInput(SMIBool status) {
+    input = status;
+  }
+}
+
+
+--- FILE: lib/core/services/supabase_service.dart ---
+// lib/core/services/supabase_service.dart
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class SupabaseService {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  // --- الدالة الجديدة ---
+  /// جلب بيانات AppUser من جدول users باستخدام uid
+  Future<AppUser?> getUserData(String uid) async {
+    try {
+      final data = await _client.from('users').select().eq('id', uid).single();
+      // تحويل الـ Map إلى كائن AppUser
+      return AppUser(
+        uid: data['id'],
+        email: data['email'],
+        name: data['name'],
+        profileImageUrl: data['profile_image_url'],
+        isAdmin: data['is_admin'] ?? false,
+        locale: data['locale'],
+        address: data['address'],
+      );
+    } catch (e) {
+      // قد لا يكون المستخدم موجودًا في جدولنا بعد، أو قد يحدث خطأ
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+  // --- نهاية الدالة الجديدة ---
+  
+  Future<Product> getProductById(String productId) async {
+    try {
+      final response = await _client.from('products').select().eq('id', productId).single();
+      return Product(
+        id: response['id'].toString(), nameAr: response['name_ar'], nameEn: response['name_en'],
+        productNumber: response['product_number'], price: (response['price'] as num).toDouble(),
+        descriptionAr: response['description_ar'], descriptionEn: response['description_en'],
+        imageUrls: List<String>.from(response['image_urls']), categoryId: response['category_id'].toString(),
+        brand: response['brand'], tags: List<String>.from(response['tags'] ?? []),
+      );
+    } catch (e) {
+      print('Error getting product by ID from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _client.from('products').select().eq('category_id', categoryId);
+      return response.map((item) => Product(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        productNumber: item['product_number'], price: (item['price'] as num).toDouble(),
+        descriptionAr: item['description_ar'], descriptionEn: item['description_en'],
+        imageUrls: List<String>.from(item['image_urls']), categoryId: item['category_id'].toString(),
+        brand: item['brand'], tags: List<String>.from(item['tags'] ?? []),
+      )).toList();
+    } catch (e) {
+      print('Error getting products by category from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Category>> getCategories() async {
+    try {
+      final response = await _client.from('categories').select();
+      return response.map((item) => Category(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        imageUrl: item['image_url'], parentCategoryId: item['parent_category_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting categories from Supabase: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<BannerAd>> getBanners() async {
+    try {
+      final response = await _client.from('banners').select();
+      return response.map((item) => BannerAd(
+        id: item['id'].toString(), imageUrl: item['image_url'],
+        targetType: BannerTargetType.values.byName(item['target_type'] ?? 'none'),
+        targetId: item['target_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting banners from Supabase: $e');
+      rethrow;
+    }
+  }
+}
+
+
+--- FILE: lib/core/theme/app_colors.dart ---
+// lib/core/theme/app_colors.dart
+
+import 'package:flutter/material.dart';
+
+class AppColors {
+  // --- لوحة الألوان الجديدة ---
+  static const Color primary = Color(0xFF0D47A1);   // أزرق داكن وأنيق
+  static const Color secondary = Color(0xFF00BCD4);  // سماوي/تركواز حيوي
+  
+  // ألوان الخلفيات والأسطح
+  static const Color background = Color(0xFFF4F6F8); // رمادي فاتح جدًا ومريح
+  static const Color surface = Colors.white;
+
+  // ألوان النصوص
+  static const Color textPrimary = Color(0xFF1A2536); // أسود غير حاد
+  static const Color textSecondary = Color(0xFF707070); // رمادي للنصوص الثانوية
+
+  // ألوان أخرى
+  static const Color error = Color(0xFFD32F2F);
+  static const Color success = Color(0xFF388E3C);
+  static const Color white = Colors.white;
+}
+
+
+--- FILE: lib/core/theme/app_theme.dart ---
+// lib/core/theme/app_theme.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/theme/app_colors.dart';
+
+class AppTheme {
+  static final ThemeData lightTheme = ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Poppins',
+    primaryColor: AppColors.primary,
+    scaffoldBackgroundColor: AppColors.background,
+
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      primary: AppColors.primary,
+      secondary: AppColors.secondary,
+      background: AppColors.background,
+      surface: AppColors.surface,
+      error: AppColors.error,
+      brightness: Brightness.light,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      elevation: 1.0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600),
+    ),
+
+    cardTheme: CardThemeData(
+      elevation: 1.0,
+      shadowColor: Colors.black12,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+      ),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    ),
+
+    textTheme: const TextTheme(
+      headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      bodyLarge: TextStyle(color: AppColors.textPrimary, height: 1.5),
+      bodyMedium: TextStyle(color: AppColors.textSecondary),
+    ),
+  );
+}
+
+
+--- FILE: lib/features/admin/presentation/pages/admin_panel_page.dart ---
+// lib/features/admin/presentation/pages/admin_panel_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class AdminPanelPage extends ConsumerWidget {
+  const AdminPanelPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة تحكم المسؤول'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // قائمة بالوظائف الإدارية
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined),
+            title: const Text('إدارة المنتجات'),
+            subtitle: const Text('إضافة، تعديل، وحذف المنتجات'),
+            onTap: () {
+              // TODO: Navigate to Manage Products screen
+              print('Navigate to Manage Products');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('إدارة الفئات'),
+            subtitle: const Text('إضافة، تعديل، وحذف الفئات'),
+            onTap: () {
+              // TODO: Navigate to Manage Categories screen
+              print('Navigate to Manage Categories');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.view_carousel_outlined),
+            title: const Text('إدارة البانرات'),
+            subtitle: const Text('إضافة، تعديل، وحذف البانرات الإعلانية'),
+            onTap: () {
+              // TODO: Navigate to Manage Banners screen
+              print('Navigate to Manage Banners');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/auth/presentation/providers/auth_providers.dart ---
+// // lib/features/auth/presentation/providers/auth_providers.dart
+
+// import 'package:riverpod/riverpod.dart';
+// import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:syria_store/core/models/models.dart';
+// import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+// // هذا الـ Provider يراقب حالة المصادقة في Supabase
+// final authStateProvider = StreamProvider<AuthState>((ref) {
+//   return Supabase.instance.client.auth.onAuthStateChange;
+// });
+
+// // هذا الـ Provider يجلب بيانات AppUser للمستخدم المسجل دخوله حاليًا
+// final currentUserProvider = FutureProvider<AppUser?>((ref) async {
+//   // نراقب حالة المصادقة
+//   final authState = ref.watch(authStateProvider);
+//   final supabaseService = ref.watch(supabaseServiceProvider);
+
+//   // إذا كان هناك مستخدم مسجل دخوله، نجلب بياناته من جدول users
+//   final user = authState.value?.session?.user;
+//   if (user != null) {
+//     return await supabaseService.getUserData(user.id);
+//   }
+//   return null;
+// });
+
+
+--- FILE: lib/features/logs/presentation/pages/logs_page.dart ---
+// lib/features/logs/presentation/pages/logs_page.dart
+import 'package:flutter/material.dart';
+
+class LogsPage extends StatelessWidget {
+  const LogsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('سجل الإجراءات'),
+      ),
+      body: const Center(
+        child: Text('سيتم بناء هذه الصفحة لاحقًا لعرض كل السجلات'),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/data/models/agreement_item_model.dart ---
+// lib/features/suppliers/data/models/agreement_item_model.dart
+import 'package:equatable/equatable.dart';
+
+class AgreementItem extends Equatable {
+  final String tempId; 
+  final String itemName;
+  final int totalQuantity;
+  final double unitPrice;
+  final DateTime expectedDeliveryDate;
+
+  const AgreementItem({
+    required this.tempId,
+    required this.itemName,
+    required this.totalQuantity,
+    required this.unitPrice,
+    required this.expectedDeliveryDate,
+  });
+
+  double get subtotal => totalQuantity * unitPrice;
+
+  // دالة جديدة لتحويل البند إلى صيغة JSON لإرسالها للدالة الذكية
+  Map<String, dynamic> toJson() {
+    return {
+      'itemName': itemName,
+      'totalQuantity': totalQuantity,
+      'unitPrice': unitPrice,
+      'expectedDeliveryDate': expectedDeliveryDate.toIso8601String(),
+    };
+  }
+
+  @override
+  List<Object?> get props => [tempId];
+}
+
+
+--- FILE: lib/features/suppliers/data/models/supplier_agreement_model.dart ---
+// lib/features/suppliers/data/models/supplier_agreement_model.dart
+class SupplierAgreement {
+  final String id;
+  final String? supplierName; // <-- جعله قابلاً ليكون فارغًا
+  final String agreementDetails;
+  final double totalAmount;
+  final DateTime? expectedDeliveryDate; // <-- جعله قابلاً ليكون فارغًا
+  final String status;
+
+  SupplierAgreement({
+    required this.id,
+    this.supplierName,
+    required this.agreementDetails,
+    required this.totalAmount,
+    this.expectedDeliveryDate,
+    required this.status,
+  });
+
+  factory SupplierAgreement.fromJson(Map<String, dynamic> json) {
+    return SupplierAgreement(
+      id: json['id'] ?? '',
+      supplierName: json['suppliers'] != null ? json['suppliers']['name'] : null,
+      agreementDetails: json['agreement_details'] ?? 'لا توجد تفاصيل',
+      totalAmount: double.tryParse(json['total_amount']?.toString() ?? '0.0') ?? 0.0,
+      expectedDeliveryDate: json['expected_delivery_date'] != null
+          ? DateTime.tryParse(json['expected_delivery_date'])
+          : null,
+      status: json['status'] ?? 'غير معروف',
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/pages/add_agreement_page.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/add_item_dialog.dart';
+
+class AddAgreementPage extends ConsumerStatefulWidget {
+  const AddAgreementPage({super.key});
+  @override
+  ConsumerState<AddAgreementPage> createState() => _AddAgreementPageState();
+}
+
+class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
+  final _formKey = GlobalKey<FormState>();
+  Supplier? _selectedSupplier;
+  final _notesController = TextEditingController();
+  final _downPaymentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    _downPaymentController.dispose();
+    Future.microtask(() => ref.read(agreementFormProvider.notifier).clear());
+    super.dispose();
+  }
+
+  void _showAddSupplierDialog() {
+    final selectedCategory = ref.read(selectedCategoryProvider);
+    if (selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء اختيار تصنيف أولاً'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    // Logic to show dialog
+    showDialog(context: context, builder: (dialogContext) {
+      final dialogFormKey = GlobalKey<FormState>();
+      final nameController = TextEditingController();
+      final phoneController = TextEditingController();
+      final addressController = TextEditingController();
+
+      return AlertDialog(
+        title: const Text('إضافة مورد جديد'),
+        content: Form(
+          key: dialogFormKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم المورد'), validator: (val) => val == null || val.isEmpty ? 'الحقل مطلوب' : null),
+              Directionality(textDirection: TextDirection.ltr, child: TextFormField(controller: phoneController, decoration: const InputDecoration(labelText: 'رقم الهاتف'), keyboardType: TextInputType.phone, textAlign: TextAlign.left)),
+              TextFormField(controller: addressController, decoration: const InputDecoration(labelText: 'العنوان')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('إلغاء')),
+          Consumer(builder: (context, ref, child) {
+            final isLoading = ref.watch(addSupplierControllerProvider);
+            return ElevatedButton(
+              onPressed: isLoading ? null : () async {
+                if (dialogFormKey.currentState!.validate()) {
+                  final newSupplier = await ref.read(addSupplierControllerProvider.notifier).addSupplier(
+                    context: context,
+                    name: nameController.text.trim(),
+                    phone: phoneController.text.trim(),
+                    address: addressController.text.trim(),
+                    categoryId: selectedCategory.id,
+                  );
+                  if (newSupplier != null && mounted) {
+                    setState(() => _selectedSupplier = newSupplier);
+                    Navigator.of(dialogContext).pop();
+                  }
+                }
+              },
+              child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+            );
+          }),
+        ],
+      );
+    });
+  }
+
+  void _submitAgreement() {
+    final agreementItems = ref.read(agreementFormProvider);
+    if (_formKey.currentState!.validate() && agreementItems.isNotEmpty) {
+      ref.read(agreementControllerProvider.notifier).createFullAgreement(
+        context: context,
+        supplierId: _selectedSupplier!.id,
+        notes: _notesController.text.trim(),
+        items: agreementItems,
+        downPayment: double.tryParse(_downPaymentController.text.trim()) ?? 0.0,
+      ).then((success) {
+        if (success && mounted) { context.pop(); }
+      });
+    } else if (agreementItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب إضافة بند واحد على الأقل'), backgroundColor: Colors.orange));
+    }
+  }
+  
+  void _addNewItem() {
+    showDialog(context: context, builder: (_) => const AddItemDialog());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = ref.watch(agreementFormProvider);
+    final grandTotal = ref.watch(agreementFormProvider.notifier).grandTotal;
+    final isSaving = ref.watch(agreementControllerProvider);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('إنشاء اتفاقية توريد')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('معلومات الاتفاقية الأساسية', style: theme.textTheme.titleLarge),
+              const Divider(),
+              const SizedBox(height: 8),
+              Consumer(builder: (context, ref, child) { final categoriesAsync = ref.watch(supplierCategoriesProvider); return categoriesAsync.when( data: (categories) => DropdownButtonFormField<SupplierCategory>( hint: const Text('اختر تصنيف المورد'), decoration: const InputDecoration(labelText: 'التصنيف'), value: ref.watch(selectedCategoryProvider), items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(), onChanged: (category) { ref.read(selectedCategoryProvider.notifier).state = category; setState(() => _selectedSupplier = null); }, validator: (value) => value == null ? 'الرجاء اختيار تصنيف' : null, ), loading: () => const Text("..."), error: (err, stack) => Text('خطأ: $err'), ); }),
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Consumer(builder: (context, ref, child) { final suppliersAsync = ref.watch(suppliersByCategoryProvider); final selectedCategory = ref.watch(selectedCategoryProvider); return suppliersAsync.when( data: (suppliers) => DropdownButtonFormField<Supplier>( value: _selectedSupplier, hint: const Text('اختر المورد'), decoration: InputDecoration(labelText: 'المورد', enabled: selectedCategory != null), items: suppliers.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(), onChanged: (supplier) => setState(() => _selectedSupplier = supplier), validator: (value) => (selectedCategory != null && value == null) ? 'الرجاء اختيار مورد' : null, ), loading: () => const Padding(padding: EdgeInsets.all(8.0), child: Center(child: CircularProgressIndicator())), error: (err, stack) => Text('خطأ: $err'), ); }),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: IconButton.filled(
+                      icon: const Icon(Icons.add),
+                      onPressed: _showAddSupplierDialog,
+                      tooltip: 'إضافة مورد جديد',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(controller: _notesController, decoration: const InputDecoration(labelText: 'ملاحظات عامة'), maxLines: 2),
+              const SizedBox(height: 24),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Text('بنود الاتفاقية', style: theme.textTheme.titleLarge), FilledButton.icon(onPressed: _addNewItem, icon: const Icon(Icons.add), label: const Text('إضافة بند')), ]),
+              const Divider(),
+              if (items.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 32.0), child: Center(child: Text('لم يتم إضافة أي بنود بعد.')))
+              else ListView.builder(
+                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      title: Text(item.itemName),
+                      subtitle: Text('الكمية: ${item.totalQuantity} - السعر: \$${item.unitPrice}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('\$${item.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          IconButton(icon: Icon(Icons.delete_outline, color: theme.colorScheme.error), onPressed: () => ref.read(agreementFormProvider.notifier).removeItem(item.tempId)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              TextFormField(controller: _downPaymentController, decoration: const InputDecoration(labelText: 'العربون (دفعة أولى)', prefixIcon: Icon(Icons.payments_outlined), suffixText: '\$'), keyboardType: TextInputType.number),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Text('المجموع النهائي', style: theme.textTheme.headlineSmall), Text('\$${grandTotal.toStringAsFixed(2)}', style: theme.textTheme.headlineSmall?.copyWith(color: theme.primaryColor)) ],),
+              ),
+              ElevatedButton(
+                onPressed: isSaving ? null : _submitAgreement,
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                child: isSaving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white)) : const Text('حفظ الاتفاقية النهائية'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/pages/agreement_details_page.dart ---
+// lib/features/suppliers/presentation/pages/agreement_details_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_details_provider.dart'; // <-- تم التحديث هنا
+
+class AgreementDetailsPage extends ConsumerWidget {
+  final String agreementId;
+  const AgreementDetailsPage({super.key, required this.agreementId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agreementAsync = ref.watch(agreementDetailsProvider(agreementId));
+    final isUpdating = ref.watch(updateAgreementStatusControllerProvider);
+    final theme = Theme.of(context);
+
+    void handleUpdate(String newStatus) {
+      ref.read(updateAgreementStatusControllerProvider.notifier).updateStatus(
+            context: context,
+            agreementId: agreementId,
+            newStatus: newStatus,
+          );
+    }
+
+    void handlePostpone() async {
+      final agreement = agreementAsync.value;
+      if (agreement == null) return;
+      final newDate = await showDatePicker(context: context, initialDate: agreement.expectedDeliveryDate ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2101));
+      if (newDate != null) {
+        ref.read(updateAgreementStatusControllerProvider.notifier).postponeAgreement(context: context, agreementId: agreementId, newDate: newDate);
+      }
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('تفاصيل الاتفاقية')),
+      body: agreementAsync.when(
+        data: (agreement) {
+          if (agreement == null) return const Center(child: Text('لم يتم العثور على الاتفاقية.'));
+          final statusInfo = _getStatusInfo(agreement.status, theme);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(agreement.supplierName ?? 'مورد غير محدد', style: theme.textTheme.headlineMedium?.copyWith(color: theme.primaryColor)),
+                const SizedBox(height: 8),
+                Row(children: [ const Text('الحالة: ', style: TextStyle(fontWeight: FontWeight.bold)), Icon(statusInfo['icon'], color: statusInfo['color'], size: 18), const SizedBox(width: 4), Text(statusInfo['text'], style: theme.textTheme.titleMedium?.copyWith(color: statusInfo['color'], fontWeight: FontWeight.bold)), ]),
+                const SizedBox(height: 24),
+                const Text('تفاصيل الاتفاق:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(agreement.agreementDetails, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16)),
+                const Divider(height: 32),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ const Text('المبلغ الإجمالي:', style: TextStyle(fontWeight: FontWeight.bold)), Text('\$${agreement.totalAmount.toStringAsFixed(2)}', style: theme.textTheme.titleLarge) ]),
+                const SizedBox(height: 12),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ const Text('تاريخ التسليم المتوقع:', style: TextStyle(fontWeight: FontWeight.bold)), Text(agreement.expectedDeliveryDate != null ? DateFormat('yyyy/MM/dd', 'ar').format(agreement.expectedDeliveryDate!) : 'غير محدد', style: theme.textTheme.titleLarge) ]),
+                const SizedBox(height: 40),
+                const Text('الإجراءات:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 16),
+                if (isUpdating) const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                else Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    ElevatedButton.icon(onPressed: () => handleUpdate('completed'), icon: const Icon(Icons.check_circle_outline), label: const Text('تم التسليم'), style: ElevatedButton.styleFrom(backgroundColor: Colors.green)),
+                    ElevatedButton.icon(onPressed: handlePostpone, icon: const Icon(Icons.edit_calendar_outlined), label: const Text('تأجيل'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange)),
+                    ElevatedButton.icon(onPressed: () => handleUpdate('cancelled'), icon: const Icon(Icons.cancel_outlined), label: const Text('إلغاء'), style: ElevatedButton.styleFrom(backgroundColor: Colors.red)),
+                  ],
+                )
+              ],
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('خطأ في جلب التفاصيل: $err')),
+      ),
+    );
+  }
+  
+  Map<String, dynamic> _getStatusInfo(String status, ThemeData theme) {
+    switch (status) {
+      case 'pending_delivery': return {'color': Colors.orange.shade700, 'icon': Icons.hourglass_top, 'text': 'قيد التسليم'};
+      case 'completed': return {'color': Colors.green.shade700, 'icon': Icons.check_circle, 'text': 'مكتمل'};
+      case 'delayed': return {'color': Colors.red.shade700, 'icon': Icons.error, 'text': 'متأخر'};
+      case 'cancelled': return {'color': Colors.grey.shade700, 'icon': Icons.cancel, 'text': 'ملغي'};
+      default: return {'color': Colors.grey, 'icon': Icons.help, 'text': 'غير معروف'};
+    }
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/pages/supplier_agreements_page.dart ---
+// lib/features/suppliers/presentation/pages/supplier_agreements_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart'; // <-- تم التحديث هنا
+import 'package:syria_store/features/suppliers/presentation/widgets/agreement_card.dart';
+
+class SupplierAgreementsPage extends ConsumerWidget {
+  const SupplierAgreementsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agreementsAsync = ref.watch(agreementsProvider);
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('اتفاقيات الموردين'),
+        actions: [
+          IconButton(onPressed: () => context.push('/add-agreement'), icon: const Icon(Icons.add_circle_outline), tooltip: 'إضافة اتفاقية جديدة'),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(agreementsProvider.future),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'ابحث...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                ),
+              ),
+            ),
+            Expanded(
+              child: agreementsAsync.when(
+                data: (agreements) {
+                  if (agreements.isEmpty) {
+                    return LayoutBuilder(builder: (context, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(constraints: BoxConstraints(minHeight: constraints.maxHeight), child: const Center(child: Text('لا توجد اتفاقيات لعرضها حاليًا.'))),
+                    ));
+                  }
+                  return ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: agreements.length,
+                    itemBuilder: (context, index) => AgreementCard(agreement: agreements[index]),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(child: Text('حدث خطأ: ${err.toString()}')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/providers/agreement_details_provider.dart ---
+// lib/features/suppliers/presentation/providers/agreement_details_provider.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart'; // <-- استيراد الـ provider الرئيسي
+
+// Provider لجلب تفاصيل اتفاقية واحدة
+final agreementDetailsProvider = FutureProvider.autoDispose.family<SupplierAgreement?, String>((ref, agreementId) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase.from('supplier_agreements').select('*, suppliers(name)').eq('id', agreementId).single();
+    return SupplierAgreement.fromJson(response);
+  } catch (e) { return null; }
+});
+
+// Controller لتحديث حالة الاتفاقية
+final updateAgreementStatusControllerProvider = StateNotifierProvider.autoDispose<UpdateAgreementStatusController, bool>((ref) {
+  return UpdateAgreementStatusController(ref: ref);
+});
+class UpdateAgreementStatusController extends StateNotifier<bool> {
+  final Ref _ref;
+  UpdateAgreementStatusController({required Ref ref}) : _ref = ref, super(false);
+
+  Future<void> _refreshProviders(String agreementId) async {
+    _ref.invalidate(agreementsProvider);
+    await _ref.refresh(agreementDetailsProvider(agreementId).future);
+  }
+
+  Future<void> updateStatus({ required BuildContext context, required String agreementId, required String newStatus, }) async {
+    state = true;
+    try {
+      await _ref.read(supabaseProvider).rpc('update_agreement_status', params: { 'agreement_id_input': agreementId, 'new_status': newStatus, 'notes': null });
+      await _refreshProviders(agreementId);
+      if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث الحالة بنجاح'), backgroundColor: Colors.blue)); }
+    } catch (e) {
+      if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل تحديث الحالة: $e'), backgroundColor: Colors.red)); }
+    } finally { state = false; }
+  }
+
+  Future<void> postponeAgreement({ required BuildContext context, required String agreementId, required DateTime newDate, }) async {
+    state = true;
+    try {
+      await _ref.read(supabaseProvider).rpc('postpone_agreement', params: { 'agreement_id_input': agreementId, 'new_delivery_date_input': newDate.toIso8601String(), });
+      await _refreshProviders(agreementId);
+      if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تأجيل الاتفاقية بنجاح'), backgroundColor: Colors.blue)); }
+    } catch (e) {
+      if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل التأجيل: $e'), backgroundColor: Colors.red)); }
+    } finally { state = false; }
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/providers/agreement_form_provider.dart ---
+import 'dart:convert';
+import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+class SupplierCategory extends Equatable { final int id; final String name; const SupplierCategory({required this.id, required this.name}); @override List<Object?> get props => [id]; }
+class Supplier extends Equatable { final String id; final String name; const Supplier({required this.id, required this.name}); @override List<Object?> get props => [id]; }
+
+final supplierCategoriesProvider = FutureProvider.autoDispose<List<SupplierCategory>>((ref) async { final supabase = ref.watch(supabaseProvider); final response = await supabase.from('supplier_categories').select('id, name').order('name'); return response.map((item) => SupplierCategory(id: item['id'], name: item['name'])).toList(); });
+final selectedCategoryProvider = StateProvider.autoDispose<SupplierCategory?>((ref) => null);
+final suppliersByCategoryProvider = FutureProvider.autoDispose<List<Supplier>>((ref) async { final supabase = ref.watch(supabaseProvider); final selectedCategory = ref.watch(selectedCategoryProvider); if (selectedCategory == null) return []; final response = await supabase.from('suppliers').select('id, name, supplier_category_link!inner(category_id)').eq('supplier_category_link.category_id', selectedCategory.id).order('name'); return response.map((item) => Supplier(id: item['id'], name: item['name'])).toList(); });
+
+final agreementFormProvider = StateNotifierProvider<AgreementFormNotifier, List<AgreementItem>>((ref) { return AgreementFormNotifier(); });
+class AgreementFormNotifier extends StateNotifier<List<AgreementItem>> { AgreementFormNotifier() : super([]); void addItem(AgreementItem item) { state = [...state, item]; } void removeItem(String tempId) { state = state.where((item) => item.tempId != tempId).toList(); } double get grandTotal => state.fold(0.0, (sum, item) => sum + item.subtotal); void clear() { state = []; } }
+
+final addSupplierControllerProvider = StateNotifierProvider.autoDispose<AddSupplierController, bool>((ref) { return AddSupplierController(ref: ref); });
+class AddSupplierController extends StateNotifier<bool> { final Ref _ref; AddSupplierController({required Ref ref}) : _ref = ref, super(false); Future<Supplier?> addSupplier({ required BuildContext context, required String name, String? phone, String? address, required int categoryId, }) async { state = true; try { final supabase = _ref.read(supabaseProvider); final newSupplierData = await supabase.from('suppliers').insert({'name': name, 'phone_number': phone, 'address': address}).select().single(); final newSupplierId = newSupplierData['id']; await supabase.from('supplier_category_link').insert({'supplier_id': newSupplierId, 'category_id': categoryId}); _ref.invalidate(suppliersByCategoryProvider); if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تمت إضافة "$name" بنجاح'), backgroundColor: Colors.green));} state = false; return Supplier(id: newSupplierId, name: name); } catch (e) { state = false; if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));} return null; } } }
+
+final agreementControllerProvider = StateNotifierProvider.autoDispose<AgreementController, bool>((ref) { return AgreementController(ref: ref); });
+class AgreementController extends StateNotifier<bool> {
+  final Ref _ref; AgreementController({required Ref ref}) : _ref = ref, super(false);
+  Future<bool> createFullAgreement({ required BuildContext context, required String supplierId, String? notes, required List<AgreementItem> items, double downPayment = 0,}) async {
+    state = true;
+    try {
+      final itemsJson = jsonEncode(items.map((item) => item.toJson()).toList());
+      await _ref.read(supabaseProvider).rpc('create_full_agreement', params: { 'supplier_id_input': supplierId, 'notes_input': notes, 'items_jsonb_in': itemsJson, 'down_payment_input': downPayment });
+      _ref.invalidate(agreementsProvider);
+      if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الاتفاقية بنجاح'), backgroundColor: Colors.green)); }
+      state = false; return true;
+    } catch (e) {
+      state = false; if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل حفظ الاتفاقية: $e'), backgroundColor: Colors.red)); } return false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/providers/agreement_list_provider.dart ---
+// lib/features/suppliers/presentation/providers/agreement_list_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+
+final supabaseProvider = Provider((ref) => Supabase.instance.client);
+
+// Provider لجلب قائمة الاتفاقيات الرئيسية
+final agreementsProvider = FutureProvider.autoDispose<List<SupplierAgreement>>((ref) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase
+        .from('supplier_agreements')
+        .select('*, suppliers(name)')
+        .order('created_at', ascending: false);
+    return response.map((item) => SupplierAgreement.fromJson(item)).toList();
+  } catch(e) {
+    print('Error fetching agreements: $e');
+    rethrow;
+  }
+});
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/add_item_dialog.dart ---
+// lib/features/suppliers/presentation/widgets/add_item_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
+// --- هذا هو السطر الذي تم إصلاحه ---
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+import 'package:uuid/uuid.dart';
+
+class AddItemDialog extends ConsumerStatefulWidget {
+  const AddItemDialog({super.key});
+
+  @override
+  ConsumerState<AddItemDialog> createState() => _AddItemDialogState();
+}
+
+class _AddItemDialogState extends ConsumerState<AddItemDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  DateTime? _selectedDate;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _quantityController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (pickedDate != null) {
+      setState(() => _selectedDate = pickedDate);
+    }
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      final newItem = AgreementItem(
+        tempId: const Uuid().v4(),
+        itemName: _nameController.text.trim(),
+        totalQuantity: int.parse(_quantityController.text.trim()),
+        unitPrice: double.parse(_priceController.text.trim()),
+        expectedDeliveryDate: _selectedDate!,
+      );
+      ref.read(agreementFormProvider.notifier).addItem(newItem);
+      Navigator.of(context).pop(); // إغلاق النافذة بعد الحفظ
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('إضافة بند جديد'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'اسم البند/الصنف'),
+                validator: (val) => (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+              ),
+              TextFormField(
+                controller: _quantityController,
+                decoration: const InputDecoration(labelText: 'الكمية'),
+                keyboardType: TextInputType.number,
+                validator: (val) => (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+              ),
+              TextFormField(
+                controller: _priceController,
+                decoration: const InputDecoration(labelText: 'سعر الوحدة', suffixText: '\$'),
+                keyboardType: TextInputType.number,
+                validator: (val) => (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+              ),
+              TextFormField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: _selectedDate == null ? '' : DateFormat('yyyy/MM/dd').format(_selectedDate!)
+                ),
+                decoration: const InputDecoration(labelText: 'تاريخ تسليم البند', hintText: 'اختر تاريخًا'),
+                onTap: _pickDate,
+                validator: (value) => _selectedDate == null ? 'الرجاء اختيار تاريخ' : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
+        ElevatedButton(onPressed: _onSave, child: const Text('إضافة')),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/agreement_card.dart ---
+// lib/features/suppliers/presentation/widgets/agreement_card.dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart'; // <-- استيراد GoRouter
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+
+class AgreementCard extends StatelessWidget {
+  final SupplierAgreement agreement;
+  const AgreementCard({super.key, required this.agreement});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    int? daysRemaining;
+    if (agreement.expectedDeliveryDate != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final deliveryDate = DateTime(agreement.expectedDeliveryDate!.year, agreement.expectedDeliveryDate!.month, agreement.expectedDeliveryDate!.day);
+      daysRemaining = deliveryDate.difference(today).inDays;
+    }
+    final Map<String, dynamic> statusInfo = _getStatusInfo(agreement.status, theme);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 4,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        // --- هنا التعديل الرئيسي ---
+        onTap: () {
+          context.push('/agreement-details/${agreement.id}');
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ... بقية الكود يبقى كما هو ...
+              Row( mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Text( agreement.supplierName ?? 'مورد غير محدد', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), ), Container( padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration( color: statusInfo['color'].withOpacity(0.1), borderRadius: BorderRadius.circular(20), ), child: Row( children: [ Icon(statusInfo['icon'], color: statusInfo['color'], size: 16), const SizedBox(width: 4), Text( statusInfo['text'], style: TextStyle(color: statusInfo['color'], fontWeight: FontWeight.bold), ), ], ), ), ], ),
+              const Divider(height: 24),
+              Text( agreement.agreementDetails, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600), ),
+              const SizedBox(height: 16),
+              Row( mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ if (agreement.expectedDeliveryDate != null) _buildInfoChip( theme, Icons.calendar_today_outlined, DateFormat('yyyy/MM/dd', 'ar').format(agreement.expectedDeliveryDate!), ), if (daysRemaining != null && daysRemaining >= 0 && agreement.status == 'pending_delivery') _buildInfoChip( theme, Icons.hourglass_top_outlined, 'باقي $daysRemaining يوم', color: theme.colorScheme.primary, ), ], ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getStatusInfo(String status, ThemeData theme) {
+    switch (status) {
+      case 'pending_delivery': return {'color': Colors.orange.shade700, 'icon': Icons.hourglass_top, 'text': 'قيد التسليم'};
+      case 'completed': return {'color': Colors.green.shade700, 'icon': Icons.check_circle, 'text': 'مكتمل'};
+      case 'delayed': return {'color': Colors.red.shade700, 'icon': Icons.error, 'text': 'متأخر'};
+      case 'cancelled': return {'color': Colors.grey.shade700, 'icon': Icons.cancel, 'text': 'ملغي'};
+      default: return {'color': Colors.grey, 'icon': Icons.help, 'text': 'غير معروف'};
+    }
+  }
+
+  Widget _buildInfoChip(ThemeData theme, IconData icon, String label, {Color? color}) {
+    return Row( children: [ Icon(icon, size: 18, color: color ?? theme.textTheme.bodySmall?.color), const SizedBox(width: 6), Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: color, fontWeight: FontWeight.w500)), ], );
+  }
+}
+
+
+--- FILE: lib/main.dart ---
+// lib/main.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/routes/app_router.dart';
+import 'package:syria_store/core/env/env.dart';
+import 'package:syria_store/core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
+  );
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'مفروشات دمشق',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      
+      // إعادة تفعيل routerConfig ليعمل نظام التوجيه
+      routerConfig: goRouter,
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ar', ''), // Arabic
+        Locale('en', ''), // English
+      ],
+      locale: const Locale('ar', ''),
+    );
+  }
+}
+
+
+--- FILE: test/widget_test.dart (Test File) ---
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:syria_store/main.dart';
+
+void main() {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+
+
