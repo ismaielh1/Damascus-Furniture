@@ -1,0 +1,102 @@
+--- FILE: lib/main.dart ---
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/routes/app_router.dart';
+import 'package:syria_store/core/env/env.dart';
+import 'package:syria_store/core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+void main() async {
+  // استخدام runZonedGuarded لضمان التقاط جميع الأخطاء
+  runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // --- معالج أخطاء Flutter ---
+      // يلتقط الأخطاء التي تحدث داخل إطار عمل Flutter (أثناء بناء الواجهات، التخطيط، الرسم)
+      FlutterError.onError = (FlutterErrorDetails details) {
+        // طباعة الخطأ وتفاصيله في الكونسول
+        FlutterError.dumpErrorToConsole(details);
+        // يمكنك هنا إرسال الخطأ إلى خدمة مراقبة مثل Sentry أو Firebase Crashlytics
+      };
+
+      await Supabase.initialize(
+        url: Env.supabaseUrl,
+        anonKey: Env.supabaseAnonKey,
+      );
+
+      runApp(const ProviderScope(child: MyApp()));
+    },
+    (error, stack) {
+      // --- معالج الأخطاء الشامل لـ Dart ---
+      // يلتقط الأخطاء التي تحدث خارج إطار عمل Flutter (مثل الأخطاء في async gaps)
+      debugPrint('Caught Dart Error: $error');
+      debugPrint('Stack trace: $stack');
+      // يمكنك هنا أيضًا إرسال الخطأ إلى خدمة المراقبة
+    },
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'مفروشات دمشق',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+
+      routerConfig: goRouter,
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ar', ''), // Arabic
+        Locale('en', ''), // English
+      ],
+      locale: const Locale('ar', ''),
+    );
+  }
+}
+
+
+--- FILE: test/widget_test.dart (Test File) ---
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:syria_store/main.dart';
+
+void main() {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+
+
