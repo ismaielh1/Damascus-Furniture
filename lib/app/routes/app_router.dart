@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:syria_store/features/logs/presentation/pages/logs_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/add_agreement_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/agreement_details_page.dart';
-import 'package:syria_store/features/suppliers/presentation/pages/pages/supplier_details_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/supplier_agreements_page.dart';
+import 'package:syria_store/features/suppliers/presentation/pages/supplier_details_page.dart';
 
 final goRouter = GoRouter(
   initialLocation: '/supplier-agreements',
