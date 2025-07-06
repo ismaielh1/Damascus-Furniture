@@ -1,6 +1,8 @@
 // lib/core/routing/app_router.dart
 import 'package:go_router/go_router.dart';
 import 'package:syria_store/features/logs/presentation/pages/logs_page.dart';
+import 'package:syria_store/features/products/presentation/pages/add_edit_product_page.dart';
+import 'package:syria_store/features/products/presentation/pages/product_list_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/add_agreement_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/agreement_details_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/supplier_agreements_page.dart';
@@ -14,7 +16,6 @@ final goRouter = GoRouter(
       path: '/supplier-agreements',
       builder: (context, state) => const SupplierAgreementsPage(),
       routes: [
-        // صفحة تفاصيل الاتفاقية كصفحة فرعية
         GoRoute(
           path: 'details/:agreementId',
           builder: (context, state) {
@@ -24,15 +25,12 @@ final goRouter = GoRouter(
         ),
       ],
     ),
-
-    // --- ** بداية التعديل: تنظيم مسارات الموردين ** ---
     GoRoute(
       path: '/suppliers',
       builder: (context, state) => const SuppliersListPage(),
       routes: [
-        // جعل صفحة تفاصيل المورد صفحة فرعية من قائمة الموردين
         GoRoute(
-          path: ':supplierId', // المسار النسبي هو رقم المورد فقط
+          path: ':supplierId',
           builder: (context, state) {
             final supplierName = state.extra as String? ?? 'تفاصيل المورد';
             final supplierId = state.pathParameters['supplierId']!;
@@ -44,8 +42,21 @@ final goRouter = GoRouter(
         ),
       ],
     ),
-
-    // --- ** نهاية التعديل ** ---
+    GoRoute(
+      path: '/products',
+      builder: (context, state) => const ProductListPage(),
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (context, state) => const AddEditProductPage(),
+        ),
+        // مستقبلاً يمكن إضافة مسار التعديل
+        // GoRoute(
+        //   path: 'edit/:productId',
+        //   builder: (context, state) => AddEditProductPage(productId: state.pathParameters['productId']),
+        // ),
+      ],
+    ),
     GoRoute(
       path: '/add-agreement',
       builder: (context, state) => const AddAgreementPage(),

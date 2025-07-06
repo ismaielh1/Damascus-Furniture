@@ -36,6 +36,15 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: const Text('إدارة المنتجات'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/products');
+            },
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.history_edu_outlined),
             title: const Text('سجل الإجراءات'),
             onTap: () {
