@@ -1,8 +1,16 @@
+// lib/features/suppliers/presentation/pages/add_agreement_page.dart
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
 import 'package:syria_store/features/suppliers/presentation/widgets/add_item_dialog.dart';
+
+final pickedImagesProvider = StateProvider.autoDispose<List<XFile>>(
+  (ref) => [],
+);
 
 class AddAgreementPage extends ConsumerStatefulWidget {
   const AddAgreementPage({super.key});
@@ -20,7 +28,21 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
   void dispose() {
     _notesController.dispose();
     _downPaymentController.dispose();
+    Future.microtask(() {
+      ref.invalidate(agreementFormProvider);
+      ref.invalidate(pickedImagesProvider);
+    });
     super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
+    final newImages = await picker.pickMultiImage(imageQuality: 70);
+    if (newImages.isNotEmpty) {
+      ref
+          .read(pickedImagesProvider.notifier)
+          .update((state) => [...state, ...newImages]);
+    }
   }
 
   void _showAddSupplierDialog() {
@@ -119,6 +141,8 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
 
   void _submitAgreement() {
     final agreementItems = ref.read(agreementFormProvider);
+    final imagesToUpload = ref.read(pickedImagesProvider);
+
     if (_formKey.currentState!.validate() &&
         _selectedSupplier != null &&
         agreementItems.isNotEmpty) {
@@ -131,6 +155,7 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
             items: agreementItems,
             downPayment:
                 double.tryParse(_downPaymentController.text.trim()) ?? 0.0,
+            images: imagesToUpload,
           )
           .then((success) {
             if (success && mounted) {
@@ -154,6 +179,7 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(agreementFormProvider);
+    final pickedImages = ref.watch(pickedImagesProvider);
     final grandTotal = ref.watch(agreementFormProvider.notifier).grandTotal;
     final isSaving = ref.watch(agreementControllerProvider);
     final theme = Theme.of(context);
@@ -343,6 +369,86 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                   },
                 ),
               const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('المستندات المرفقة', style: theme.textTheme.titleLarge),
+                  FilledButton.icon(
+                    onPressed: _pickImages,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('إضافة صور'),
+                  ),
+                ],
+              ),
+              const Divider(),
+              if (pickedImages.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: Center(child: Text('لم يتم اختيار أي صور بعد.')),
+                )
+              else
+                Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: pickedImages.length,
+                    itemBuilder: (context, index) {
+                      final imageFile = pickedImages[index];
+                      return Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: kIsWeb
+                                  ? Image.network(
+                                      imageFile.path,
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Image.file(
+                                      File(imageFile.path),
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                            Positioned(
+                              top: -10,
+                              right: -10,
+                              child: IconButton(
+                                icon: const CircleAvatar(
+                                  backgroundColor: Colors.red,
+                                  radius: 12,
+                                  child: Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  ref
+                                      .read(pickedImagesProvider.notifier)
+                                      .update((state) {
+                                        final newList = List<XFile>.from(state);
+                                        newList.removeAt(index);
+                                        return newList;
+                                      });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
               const Divider(),
               TextFormField(
                 controller: _downPaymentController,

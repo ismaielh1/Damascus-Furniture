@@ -1,10 +1,10 @@
-// lib/features/suppliers/data/models/agreement_item_model.dart
 import 'package:equatable/equatable.dart';
 
 class AgreementItem extends Equatable {
   final String id;
   final String itemName;
   final int totalQuantity;
+  final int receivedQuantitySoFar;
   final double unitPrice;
   final DateTime expectedDeliveryDate;
 
@@ -12,6 +12,7 @@ class AgreementItem extends Equatable {
     required this.id,
     required this.itemName,
     required this.totalQuantity,
+    required this.receivedQuantitySoFar,
     required this.unitPrice,
     required this.expectedDeliveryDate,
   });
@@ -29,17 +30,16 @@ class AgreementItem extends Equatable {
 
   factory AgreementItem.fromJson(Map<String, dynamic> json) {
     return AgreementItem(
-      // --- بداية التعديل ---
-      // تحويل الـ id إلى نص بشكل آمن للتعامل مع كل الحالات
       id: json['id'].toString(),
-      // --- نهاية التعديل ---
       itemName: json['item_name'],
       totalQuantity: (json['total_quantity'] as num).toInt(),
+      receivedQuantitySoFar: (json['received_quantity_so_far'] as num? ?? 0)
+          .toInt(),
       unitPrice: (json['unit_price'] as num).toDouble(),
       expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']),
     );
   }
 
   @override
-  List<Object?> get props => [id];
+  List<Object?> get props => [id, receivedQuantitySoFar];
 }

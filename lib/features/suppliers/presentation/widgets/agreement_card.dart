@@ -34,7 +34,6 @@ class AgreementCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          // استخدام 'push' مع المسار النسبي الجديد
           context.push('/supplier-agreements/details/${agreement.id}');
         },
         borderRadius: BorderRadius.circular(12),
@@ -50,9 +49,8 @@ class AgreementCard extends StatelessWidget {
                   Expanded(
                     child: InkWell(
                       onTap: () {
-                        // عند الضغط على اسم المورد، ننتقل لصفحته الخاصة
                         if (agreement.supplierId != null) {
-                          context.go(
+                          context.push(
                             '/suppliers/${agreement.supplierId}',
                             extra: agreement.supplierName,
                           );

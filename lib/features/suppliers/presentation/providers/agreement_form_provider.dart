@@ -1,16 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
 
 class SupplierCategory extends Equatable {
   final int id;
   final String name;
-
   const SupplierCategory({required this.id, required this.name});
-
   @override
   List<Object?> get props => [id];
 }
@@ -18,9 +20,7 @@ class SupplierCategory extends Equatable {
 class Supplier extends Equatable {
   final String id;
   final String name;
-
   const Supplier({required this.id, required this.name});
-
   @override
   List<Object?> get props => [id];
 }
@@ -67,7 +67,6 @@ final agreementFormProvider =
 
 class AgreementFormNotifier extends StateNotifier<List<AgreementItem>> {
   AgreementFormNotifier() : super([]);
-
   void addItem(AgreementItem item) {
     state = [...state, item];
   }
@@ -90,9 +89,7 @@ final addSupplierControllerProvider =
 
 class AddSupplierController extends StateNotifier<bool> {
   final Ref _ref;
-
   AddSupplierController({required Ref ref}) : _ref = ref, super(false);
-
   Future<Supplier?> addSupplier({
     required BuildContext context,
     required String name,
@@ -147,7 +144,6 @@ final agreementControllerProvider =
 
 class AgreementController extends StateNotifier<bool> {
   final Ref _ref;
-
   AgreementController({required Ref ref}) : _ref = ref, super(false);
 
   Future<bool> createFullAgreement({
@@ -156,10 +152,41 @@ class AgreementController extends StateNotifier<bool> {
     String? notes,
     required List<AgreementItem> items,
     double downPayment = 0,
+    required List<XFile> images,
   }) async {
     if (state) return false;
     state = true;
     try {
+      final supabase = _ref.read(supabaseProvider);
+      List<String> imagePaths = []; // سنحفظ المسارات هنا
+
+      if (images.isNotEmpty) {
+        final String agreementFolder =
+            'public/agreements/${DateTime.now().millisecondsSinceEpoch}';
+        const bucketName = 'agreement-documents';
+
+        for (final image in images) {
+          final fileName = image.name;
+          final uploadPath = '$agreementFolder/$fileName';
+
+          if (kIsWeb) {
+            await supabase.storage
+                .from(bucketName)
+                .uploadBinary(
+                  uploadPath,
+                  await image.readAsBytes(),
+                  fileOptions: FileOptions(contentType: image.mimeType),
+                );
+          } else {
+            await supabase.storage
+                .from(bucketName)
+                .upload(uploadPath, File(image.path));
+          }
+
+          imagePaths.add(uploadPath);
+        }
+      }
+
       final itemsList = items.map((item) => item.toJson()).toList();
 
       await _ref
@@ -171,6 +198,7 @@ class AgreementController extends StateNotifier<bool> {
               'notes_input': notes,
               'items_jsonb_in': itemsList,
               'down_payment_input': downPayment,
+              'document_urls_input': imagePaths,
             },
           );
 

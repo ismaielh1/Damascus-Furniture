@@ -1,4 +1,3 @@
-// lib/features/suppliers/presentation/widgets/add_item_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -42,12 +41,12 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   void _onSave() {
     if (_formKey.currentState!.validate()) {
       final newItem = AgreementItem(
-        // --- تصحيح اسم الحقل هنا ---
         id: const Uuid().v4(),
         itemName: _nameController.text.trim(),
         totalQuantity: int.parse(_quantityController.text.trim()),
         unitPrice: double.parse(_priceController.text.trim()),
         expectedDeliveryDate: _selectedDate!,
+        receivedQuantitySoFar: 0,
       );
       ref.read(agreementFormProvider.notifier).addItem(newItem);
       Navigator.of(context).pop();

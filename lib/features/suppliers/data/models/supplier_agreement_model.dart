@@ -7,7 +7,9 @@ class SupplierAgreement {
   final double totalAmount;
   final DateTime? expectedDeliveryDate;
   final String status;
-  final double? down_payment; // <-- ** بداية الإضافة **
+  final double? down_payment;
+  // --- ** هذا هو الحقل الذي يجب إضافته ** ---
+  final List<String> documentImagePaths;
 
   SupplierAgreement({
     required this.id,
@@ -17,9 +19,9 @@ class SupplierAgreement {
     required this.totalAmount,
     this.expectedDeliveryDate,
     required this.status,
-    this.down_payment, // <-- إضافة للحقل الجديد
+    this.down_payment,
+    required this.documentImagePaths, // مطلوب في المنشئ
   });
-  // <-- ** نهاية الإضافة **
 
   factory SupplierAgreement.fromJson(Map<String, dynamic> json) {
     return SupplierAgreement(
@@ -35,10 +37,13 @@ class SupplierAgreement {
           ? DateTime.tryParse(json['expected_delivery_date'])
           : null,
       status: json['status'] ?? 'غير معروف',
-      // --- إضافة لتحميل قيمة العربون من قاعدة البيانات ---
       down_payment: json['down_payment'] != null
           ? double.tryParse(json['down_payment'].toString())
           : null,
+      // الاسم في قاعدة البيانات هو document_image_urls، ونحن نقوم بتحميله في الحقل الجديد
+      documentImagePaths: json['document_image_urls'] != null
+          ? List<String>.from(json['document_image_urls'])
+          : [],
     );
   }
 }
