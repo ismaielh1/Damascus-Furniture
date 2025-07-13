@@ -1,0 +1,1296 @@
+--- FILE: lib/features/suppliers/presentation/widgets/details/agreement_actions_panel.dart ---
+import 'package:flutter/material.dart';
+
+class AgreementActionsPanel extends StatelessWidget {
+  final bool isUpdating;
+  final VoidCallback onMarkAsCompleted;
+  final VoidCallback onPostpone;
+  final VoidCallback onCancel;
+
+  const AgreementActionsPanel({
+    super.key,
+    required this.isUpdating,
+    required this.onMarkAsCompleted,
+    required this.onPostpone,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('الإجراءات', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 12),
+        if (isUpdating)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildActionButton(
+                onPressed: onMarkAsCompleted,
+                icon: Icons.check_circle_outline,
+                label: 'تم التسليم',
+                color: Colors.green,
+              ),
+              _buildActionButton(
+                onPressed: onPostpone,
+                icon: Icons.edit_calendar_outlined,
+                label: 'تأجيل',
+                color: Colors.orange,
+              ),
+              _buildActionButton(
+                onPressed: onCancel,
+                icon: Icons.cancel_outlined,
+                label: 'إلغاء',
+                color: Colors.red,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon),
+          label: Text(label),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/details/agreement_documents_section.dart ---
+import 'package:flutter/material.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/private_storage_image.dart';
+
+class AgreementDocumentsSection extends StatelessWidget {
+  final SupplierAgreement agreement;
+  const AgreementDocumentsSection({super.key, required this.agreement});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('المستندات المرفقة', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 8),
+        if (agreement.documentImagePaths.isEmpty)
+          const Text('لا توجد مستندات مرفقة.')
+        else
+          SizedBox(
+            height: 150,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: agreement.documentImagePaths.length,
+              itemBuilder: (context, index) {
+                final imagePath = agreement.documentImagePaths[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10.0),
+                  child: PrivateStorageImage(imagePath: imagePath),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/details/agreement_financial_summary.dart ---
+// lib/features/suppliers/presentation/widgets/details/agreement_financial_summary.dart
+import 'package:flutter/material.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/add_payment_dialog.dart';
+
+class AgreementFinancialSummary extends StatelessWidget {
+  final SupplierAgreement agreement;
+  final bool isUpdating;
+
+  const AgreementFinancialSummary({
+    super.key,
+    required this.agreement,
+    required this.isUpdating,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final remainingAmount = agreement.totalAmount - (agreement.down_payment ?? 0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('الملخص المالي', style: theme.textTheme.titleLarge),
+            if (!isUpdating)
+              TextButton.icon(
+                icon: const Icon(Icons.add_card),
+                label: const Text('إضافة دفعة'),
+                onPressed: () => showDialog(context: context, builder: (_) => AddPaymentDialog(agreementId: agreement.id)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _buildFinancialRow(theme, 'المجموع الإجمالي:', '\$${agreement.totalAmount.toStringAsFixed(2)}'),
+        _buildFinancialRow(theme, 'المبلغ المدفوع:', '\$${(agreement.down_payment ?? 0).toStringAsFixed(2)}'),
+        const Divider(thickness: 1, height: 24),
+        _buildFinancialRow(theme, 'المبلغ المتبقي:', '\$${remainingAmount.toStringAsFixed(2)}', isTotal: true),
+      ],
+    );
+  }
+
+  Widget _buildFinancialRow(ThemeData theme, String title, String value, {bool isTotal = false}) {
+    // -- بداية التعديل الكامل للدالة --
+    // نحدد الستايل الأساسي من السمة
+    TextStyle? baseStyle = isTotal
+        ? theme.textTheme.titleLarge
+        : theme.textTheme.titleMedium;
+
+    // في حال كان الستايل فارغاً من السمة، نستخدم قيمة افتراضية آمنة
+    baseStyle ??= const TextStyle(fontSize: 16);
+
+    // نطبق التعديلات على الستايل الآمن
+    final titleStyle = baseStyle.copyWith(
+      color: isTotal ? theme.primaryColor : Colors.black87,
+      fontWeight: isTotal ? FontWeight.bold : baseStyle.fontWeight,
+    );
+    
+    final valueStyle = baseStyle.copyWith(
+      color: isTotal ? theme.primaryColor : baseStyle.color,
+      fontWeight: isTotal ? FontWeight.bold : baseStyle.fontWeight,
+    );
+    // -- نهاية التعديل الكامل للدالة --
+        
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: titleStyle),
+          Text(value, style: valueStyle),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/details/agreement_header_card.dart ---
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
+
+class AgreementHeaderCard extends StatelessWidget {
+  final SupplierAgreement agreement;
+  final Map<String, dynamic> statusInfo;
+
+  const AgreementHeaderCard({
+    super.key,
+    required this.agreement,
+    required this.statusInfo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              agreement.contactName ?? 'مورد غير محدد',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: theme.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text(
+                  'الحالة: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Icon(statusInfo['icon'], color: statusInfo['color'], size: 18),
+                const SizedBox(width: 4),
+                Text(
+                  statusInfo['text'],
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: statusInfo['color'],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (agreement.expectedDeliveryDate != null)
+              Row(
+                children: [
+                  const Text(
+                    'تاريخ التسليم: ',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    DateFormat(
+                      'yyyy/MM/dd',
+                      'en_US',
+                    ).format(agreement.expectedDeliveryDate!),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 12),
+            const Text(
+              'الملاحظات:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              agreement.agreementDetails.isNotEmpty
+                  ? agreement.agreementDetails
+                  : 'لا يوجد',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/details/agreement_items_list.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_items_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/receive_item_dialog.dart';
+
+class AgreementItemsList extends ConsumerWidget {
+  final String agreementId;
+  const AgreementItemsList({super.key, required this.agreementId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemsAsync = ref.watch(agreementItemsProvider(agreementId));
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('بنود الاتفاقية', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 8),
+        itemsAsync.when(
+          data: (items) => items.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('لا توجد بنود.'),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final productName = item.product?.name ?? 'منتج غير معرف';
+                    final productSku = item.product?.sku ?? 'N/A';
+                    final isFullyReceived =
+                        item.receivedQuantitySoFar >= item.totalQuantity;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          color: isFullyReceived
+                              ? Colors.green.shade200
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    productName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '\$${item.subtotal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blueGrey,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'الرمز: $productSku',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'الكمية المطلوبة: ${item.totalQuantity} × السعر: \$${item.unitPrice.toStringAsFixed(2)}',
+                            ),
+                            const SizedBox(height: 8),
+                            if (item.totalQuantity > 0) ...[
+                              LinearProgressIndicator(
+                                value:
+                                    item.receivedQuantitySoFar /
+                                    item.totalQuantity,
+                                backgroundColor: Colors.grey.shade300,
+                                color: isFullyReceived
+                                    ? Colors.green
+                                    : Colors.orange,
+                                minHeight: 6,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'المستلم: ${item.receivedQuantitySoFar}',
+                                    style: TextStyle(
+                                      color: isFullyReceived
+                                          ? Colors.green.shade800
+                                          : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (!isFullyReceived)
+                                  TextButton.icon(
+                                    onPressed: () => showDialog(
+                                      context: context,
+                                      builder: (_) => ReceiveItemDialog(
+                                        item: item,
+                                        agreementId: agreementId,
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('استلام كمية'),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('خطأ في جلب البنود: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/edit_agreement/agreement_financials_editor.dart ---
+// lib/features/suppliers/presentation/widgets/edit_agreement/agreement_financials_editor.dart
+import 'package:flutter/material.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/add_payment_dialog.dart';
+
+class AgreementFinancialsEditor extends StatelessWidget {
+  final String agreementId;
+  final TextEditingController downPaymentController;
+
+  const AgreementFinancialsEditor({
+    super.key,
+    required this.agreementId,
+    required this.downPaymentController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("الدفعات المالية", style: theme.textTheme.titleLarge),
+            TextButton.icon(
+              icon: const Icon(Icons.add_card),
+              label: const Text('إضافة دفعة'),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => AddPaymentDialog(agreementId: agreementId),
+              ),
+            ),
+          ],
+        ),
+        const Divider(),
+        TextFormField(
+          controller: downPaymentController,
+          decoration: const InputDecoration(
+            labelText: 'إجمالي الدفعات المسجلة',
+            prefixText: '\$ ',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          enabled: false,
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/edit_agreement/agreement_items_editor.dart ---
+// lib/features/suppliers/presentation/widgets/edit_agreement/agreement_items_editor.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/edit_agreement_item_dialog.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_details_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_items_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/receive_item_dialog.dart';
+
+class AgreementItemsEditor extends ConsumerWidget {
+  final String agreementId;
+  const AgreementItemsEditor({super.key, required this.agreementId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemsAsync = ref.watch(agreementItemsProvider(agreementId));
+    final theme = Theme.of(context);
+
+    void _showDeleteConfirmation(int itemId) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('تأكيد الحذف'),
+          content: const Text('هل أنت متأكد من رغبتك في حذف هذا البند؟ سيتم حذف كل سجلات الاستلام المتعلقة به.'),
+          actions: [
+            TextButton(child: const Text('إلغاء'), onPressed: () => Navigator.of(ctx).pop()),
+            TextButton(
+              child: const Text('حذف', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                ref.read(updateAgreementStatusControllerProvider.notifier).deleteAgreementItem(
+                      context: context,
+                      itemId: itemId,
+                      agreementId: agreementId,
+                    );
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("بنود الاتفاقية", style: theme.textTheme.titleLarge),
+        const Divider(),
+        itemsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('خطأ في جلب البنود: $e'),
+          data: (items) => ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Card(
+                child: ListTile(
+                  title: Text(item.product?.name ?? "منتج محذوف"),
+                  subtitle: Text('الكمية: ${item.totalQuantity} | المستلم: ${item.receivedQuantitySoFar}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        child: const Text("استلام"),
+                        onPressed: () => showDialog(context: context, builder: (_) => ReceiveItemDialog(item: item, agreementId: agreementId)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blueGrey),
+                        onPressed: () => showDialog(context: context, builder: (_) => EditAgreementItemDialog(item: item)),
+                        tooltip: 'تعديل الكمية والسعر',
+                      ),
+                       IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                        onPressed: () => _showDeleteConfirmation(item.id),
+                        tooltip: 'حذف البند',
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/edit_agreement/agreement_main_details_form.dart ---
+// lib/features/suppliers/presentation/widgets/edit_agreement/agreement_main_details_form.dart
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+class AgreementMainDetailsForm extends StatelessWidget {
+  final String contactName;
+  final TextEditingController notesController;
+  final DateTime? selectedDeliveryDate;
+  final VoidCallback onPickDate;
+
+  const AgreementMainDetailsForm({
+    super.key,
+    required this.contactName,
+    required this.notesController,
+    required this.selectedDeliveryDate,
+    required this.onPickDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('المورد: $contactName', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Text("التفاصيل الأساسية", style: theme.textTheme.titleMedium),
+            const Divider(),
+            TextFormField(
+              controller: notesController,
+              decoration: const InputDecoration(labelText: 'ملاحظات الاتفاقية'),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              readOnly: true,
+              controller: TextEditingController(
+                text: selectedDeliveryDate != null
+                    ? DateFormat('yyyy/MM/dd').format(selectedDeliveryDate!)
+                    : '',
+              ),
+              decoration: const InputDecoration(
+                labelText: 'تاريخ التسليم المتوقع',
+                suffixIcon: Icon(Icons.calendar_today),
+              ),
+              onTap: onPickDate,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/list/agreement_filters.dart ---
+// lib/features/suppliers/presentation/widgets/list/agreement_filters.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+class AgreementFilters extends ConsumerStatefulWidget {
+  const AgreementFilters({super.key});
+
+  @override
+  ConsumerState<AgreementFilters> createState() => _AgreementFiltersState();
+}
+
+class _AgreementFiltersState extends ConsumerState<AgreementFilters> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(searchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedStatus = ref.watch(statusFilterProvider);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'ابحث عن مورد أو تفاصيل اتفاقية...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+            ),
+            onChanged: (value) {
+              ref.read(searchQueryProvider.notifier).state = value;
+            },
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FilterChip(
+                  label: const Text('الكل'),
+                  selected: selectedStatus == null,
+                  onSelected: (_) => ref.read(statusFilterProvider.notifier).state = null,
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('قيد التسليم'),
+                  selected: selectedStatus == 'pending_delivery',
+                  onSelected: (_) => ref.read(statusFilterProvider.notifier).state = 'pending_delivery',
+                  backgroundColor: Colors.orange.withOpacity(0.1),
+                  selectedColor: Colors.orange.shade700,
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('مكتمل'),
+                  selected: selectedStatus == 'completed',
+                  onSelected: (_) => ref.read(statusFilterProvider.notifier).state = 'completed',
+                  backgroundColor: Colors.green.withOpacity(0.1),
+                  selectedColor: Colors.green.shade700,
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: const Text('ملغي'),
+                  selected: selectedStatus == 'cancelled',
+                  onSelected: (_) => ref.read(statusFilterProvider.notifier).state = 'cancelled',
+                  backgroundColor: Colors.grey.withOpacity(0.1),
+                  selectedColor: Colors.grey.shade700,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/private_storage_image.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+class PrivateStorageImage extends ConsumerWidget {
+  final String imagePath;
+  const PrivateStorageImage({super.key, required this.imagePath});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<String>(
+      future: ref
+          .read(supabaseProvider)
+          .storage
+          .from('agreement-documents')
+          .createSignedUrl(imagePath, 3600), // زيادة مدة صلاحية الرابط
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+          return const Tooltip(
+            message: 'فشل تحميل الصورة',
+            child: Icon(Icons.error_outline, color: Colors.red),
+          );
+        }
+        final signedUrl = snapshot.data!;
+        return InkWell(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => Dialog(
+                child: InteractiveViewer(
+                  panEnabled: false,
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: Image.network(signedUrl),
+                ),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              signedUrl,
+              width: 150,
+              height: 150,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const Center(child: CircularProgressIndicator()),
+              errorBuilder: (context, error, stack) => const Tooltip(
+                message: 'فشل تحميل الصورة من الرابط',
+                child: Icon(Icons.broken_image_outlined, color: Colors.red),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/receive_item_dialog.dart ---
+// lib/features/suppliers/presentation/widgets/receive_item_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_details_provider.dart';
+
+class ReceiveItemDialog extends ConsumerStatefulWidget {
+  final AgreementItem item;
+  final String agreementId;
+  const ReceiveItemDialog({
+    super.key,
+    required this.item,
+    required this.agreementId,
+  });
+
+  @override
+  ConsumerState<ReceiveItemDialog> createState() => _ReceiveItemDialogState();
+}
+
+class _ReceiveItemDialogState extends ConsumerState<ReceiveItemDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _quantityController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      final quantity = int.tryParse(_quantityController.text);
+      if (quantity == null) return;
+
+      ref
+          .read(updateAgreementStatusControllerProvider.notifier)
+          .receiveItems(
+            context: context,
+            itemId: widget.item.id.toString(), // ✅ تم التعديل هنا
+            agreementId: widget.agreementId,
+            quantity: quantity,
+            notes: _notesController.text.trim(),
+          )
+          .then((success) {
+            if (success && mounted) {
+              Navigator.of(context).pop();
+            }
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSaving = ref.watch(updateAgreementStatusControllerProvider);
+    final remainingQuantity =
+        widget.item.totalQuantity - widget.item.receivedQuantitySoFar;
+    return AlertDialog(
+      title: Text('استلام: ${widget.item.product?.name ?? "منتج غير معرف"}'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الكمية المطلوبة: ${widget.item.totalQuantity}'),
+            Text('الكمية المستلمة: ${widget.item.receivedQuantitySoFar}'),
+            Text(
+              'الكمية المتبقية: $remainingQuantity',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _quantityController,
+              decoration: const InputDecoration(
+                labelText: 'الكمية المستلمة الآن',
+              ),
+              keyboardType: TextInputType.number,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'الحقل مطلوب';
+                final quantity = int.tryParse(val);
+                if (quantity == null) return 'الرجاء إدخال رقم صحيح';
+                if (quantity <= 0) return 'يجب أن تكون الكمية أكبر من صفر';
+                if (quantity > remainingQuantity)
+                  return 'لا يمكن استلام كمية أكبر من المتبقية';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: isSaving ? null : _onSave,
+          child: isSaving
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('تأكيد الاستلام'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/supplier_details/agreements_list_for_supplier.dart ---
+// lib/features/suppliers/presentation/widgets/supplier_details/agreements_list_for_supplier.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/widgets/agreement_card.dart';
+
+class AgreementsListForSupplier extends ConsumerWidget {
+  final String supplierId;
+  const AgreementsListForSupplier({super.key, required this.supplierId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final agreementsAsync = ref.watch(agreementsBySupplierProvider(supplierId));
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('كل الاتفاقيات', style: theme.textTheme.titleLarge),
+        const Divider(),
+        agreementsAsync.when(
+          data: (agreements) {
+            if (agreements.isEmpty)
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('لا توجد اتفاقيات لهذا المورد.'),
+                ),
+              );
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: agreements.length,
+              itemBuilder: (context, index) {
+                return AgreementCard(agreement: agreements[index]);
+              },
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (e, s) => Text('خطأ في جلب الاتفاقيات: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/supplier_details/financial_summary_card.dart ---
+// lib/features/suppliers/presentation/widgets/supplier_details/financial_summary_card.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
+
+class FinancialSummaryCard extends ConsumerWidget {
+  final String supplierId;
+  const FinancialSummaryCard({super.key, required this.supplierId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(
+      supplierFinancialSummaryProvider(supplierId),
+    );
+    final theme = Theme.of(context);
+
+    return summaryAsync.when(
+      data: (summary) => Card(
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Text('الملخص المالي', style: theme.textTheme.titleLarge),
+              const Divider(height: 24),
+              _buildFinancialSummaryRow(
+                'إجمالي الاتفاقيات (له):',
+                '\$${summary.totalAgreements.toStringAsFixed(2)}',
+                Colors.blue,
+              ),
+              _buildFinancialSummaryRow(
+                'إجمالي الدفعات (لنا):',
+                '\$${summary.totalPaid.toStringAsFixed(2)}',
+                Colors.green,
+              ),
+              const Divider(),
+              _buildFinancialSummaryRow(
+                'الرصيد النهائي:',
+                '\$${summary.balance.toStringAsFixed(2)}',
+                theme.primaryColor,
+                isTotal: true,
+              ),
+            ],
+          ),
+        ),
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, s) => Text('خطأ في جلب الملخص المالي: $e'),
+    );
+  }
+
+  Widget _buildFinancialSummaryRow(
+    String title,
+    String amount,
+    Color color, {
+    bool isTotal = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              color: isTotal ? Colors.black : Colors.grey.shade700,
+            ),
+          ),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/supplier_details/receipts_log_list.dart ---
+// lib/features/suppliers/presentation/widgets/supplier_details/receipts_log_list.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
+
+class ReceiptsLogList extends ConsumerWidget {
+  final String supplierId;
+  const ReceiptsLogList({super.key, required this.supplierId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final receiptsAsync = ref.watch(receiptsByContactProvider(supplierId));
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('سجل الاستلامات', style: theme.textTheme.titleLarge),
+        const Divider(),
+        receiptsAsync.when(
+          data: (receipts) {
+            if (receipts.isEmpty)
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('لا توجد استلامات مسجلة.'),
+                ),
+              );
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: receipts.length,
+              itemBuilder: (context, index) {
+                final receipt = receipts[index];
+                return ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: Text(
+                    'استلام ${receipt.receivedQuantity} من "${receipt.productName}"',
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'بتاريخ: ${DateFormat('yyyy/MM/dd', 'en_US').format(receipt.receiptDate)}',
+                      ),
+                      if (receipt.notes != null && receipt.notes!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'ملاحظات: ${receipt.notes!}',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('خطأ في جلب سجل الاستلامات: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/widgets/supplier_details/recent_payments_list.dart ---
+// lib/features/suppliers/presentation/widgets/supplier_details/recent_payments_list.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
+
+class RecentPaymentsList extends ConsumerWidget {
+  final String supplierId;
+  const RecentPaymentsList({super.key, required this.supplierId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paymentsAsync = ref.watch(supplierPaymentsProvider(supplierId));
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('آخر الدفعات', style: theme.textTheme.titleLarge),
+        const Divider(),
+        paymentsAsync.when(
+          data: (payments) {
+            if (payments.isEmpty)
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('لا توجد دفعات مسجلة.'),
+                ),
+              );
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: payments.length,
+              itemBuilder: (context, index) {
+                final payment = payments[index];
+                return ListTile(
+                  leading: const Icon(Icons.payment_outlined),
+                  title: Text(
+                    'دفعة بقيمة \$${payment.amount.toStringAsFixed(2)}',
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'بتاريخ: ${DateFormat('yyyy/MM/dd', 'en_US').format(payment.paymentDate)}',
+                      ),
+                      if (payment.notes != null && payment.notes!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'ملاحظات: ${payment.notes!}',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onTap: () => context.push(
+                    '/supplier-agreements/details/${payment.agreementId}',
+                  ),
+                );
+              },
+            );
+          },
+          loading: () =>
+              const SizedBox.shrink(), // No loader for a secondary list
+          error: (e, s) => Text('خطأ في جلب الدفعات: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/main.dart ---
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/routes/app_router.dart';
+import 'package:syria_store/core/env/env.dart';
+import 'package:syria_store/core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+void main() async {
+  // استخدام runZonedGuarded لضمان التقاط جميع الأخطاء
+  runZonedGuarded<Future<void>>(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // --- معالج أخطاء Flutter ---
+      // يلتقط الأخطاء التي تحدث داخل إطار عمل Flutter (أثناء بناء الواجهات، التخطيط، الرسم)
+      FlutterError.onError = (FlutterErrorDetails details) {
+        // طباعة الخطأ وتفاصيله في الكونسول
+        FlutterError.dumpErrorToConsole(details);
+        // يمكنك هنا إرسال الخطأ إلى خدمة مراقبة مثل Sentry أو Firebase Crashlytics
+      };
+
+      await Supabase.initialize(
+        url: Env.supabaseUrl,
+        anonKey: Env.supabaseAnonKey,
+      );
+
+      runApp(const ProviderScope(child: MyApp()));
+    },
+    (error, stack) {
+      // --- معالج الأخطاء الشامل لـ Dart ---
+      // يلتقط الأخطاء التي تحدث خارج إطار عمل Flutter (مثل الأخطاء في async gaps)
+      debugPrint('Caught Dart Error: $error');
+      debugPrint('Stack trace: $stack');
+      // يمكنك هنا أيضًا إرسال الخطأ إلى خدمة المراقبة
+    },
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'مفروشات دمشق',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+
+      routerConfig: goRouter,
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ar', ''), // Arabic
+        Locale('en', ''), // English
+      ],
+      locale: const Locale('ar', ''),
+    );
+  }
+}
+
+
+--- FILE: test/widget_test.dart (Test File) ---
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:syria_store/main.dart';
+
+void main() {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
+  });
+}
+
+

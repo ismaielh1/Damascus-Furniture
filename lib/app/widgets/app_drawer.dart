@@ -21,6 +21,22 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('فاتورة جديدة'),
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/create-invoice');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.list_alt_outlined),
+            title: const Text('سجل المبيعات'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/invoices');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.article_outlined),
             title: const Text('اتفاقيات الموردين'),
             onTap: () {
@@ -28,6 +44,7 @@ class AppDrawer extends StatelessWidget {
               context.go('/supplier-agreements');
             },
           ),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.groups_outlined),
             title: const Text('قائمة الموردين'),
@@ -37,6 +54,15 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.people_alt_outlined),
+            title: const Text('إدارة العملاء'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/customers');
+            },
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.inventory_2_outlined),
             title: const Text('إدارة المنتجات'),
             onTap: () {
@@ -45,30 +71,28 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           const Divider(),
-          // --- بداية الإضافة ---
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Text(
-              'الإعدادات والإدارة',
-              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-            ),
-          ),
           ListTile(
-            leading: const Icon(Icons.category_outlined),
-            title: const Text('إدارة تصنيفات الموردين'),
+            leading: const Icon(Icons.assessment_outlined),
+            title: const Text('التقرير المالي'),
             onTap: () {
               Navigator.pop(context);
-              context.go('/manage-supplier-categories');
+              context.go('/financial-report');
             },
           ),
-          // --- نهاية الإضافة ---
-          const Divider(),
           ListTile(
             leading: const Icon(Icons.history_edu_outlined),
             title: const Text('سجل الإجراءات'),
             onTap: () {
               Navigator.pop(context);
               context.go('/logs');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_outlined),
+            title: const Text('الإعدادات'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/settings');
             },
           ),
         ],

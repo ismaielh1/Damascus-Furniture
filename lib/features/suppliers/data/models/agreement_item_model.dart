@@ -1,51 +1,49 @@
 // lib/features/suppliers/data/models/agreement_item_model.dart
 import 'package:equatable/equatable.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
 
 class AgreementItem extends Equatable {
-  final String id;
-  final String productId;
-  final String itemName;
+  final int id;
+  final String agreementId; // -- تمت الإضافة --
+  final ProductModel? product;
   final int totalQuantity;
-  final int receivedQuantitySoFar;
   final double unitPrice;
+  final int receivedQuantitySoFar;
   final DateTime expectedDeliveryDate;
 
   const AgreementItem({
     required this.id,
-    required this.productId,
-    required this.itemName,
+    required this.agreementId, // -- تمت الإضافة --
+    required this.product,
     required this.totalQuantity,
-    required this.receivedQuantitySoFar,
     required this.unitPrice,
-    required this.expectedDeliveryDate,
+    required this.receivedQuantitySoFar,
+    required this.expectedDeliveryDate, required String productId,
   });
 
   double get subtotal => totalQuantity * unitPrice;
 
-  Map<String, dynamic> toJson() {
-    return {
-      'product_id': productId,
-      'total_quantity': totalQuantity,
-      'unit_price': unitPrice,
-      'expected_delivery_date': expectedDeliveryDate.toIso8601String(),
-    };
-  }
+  @override
+  List<Object?> get props => [
+    id,
+    product,
+    totalQuantity,
+    unitPrice,
+    receivedQuantitySoFar,
+  ];
 
   factory AgreementItem.fromJson(Map<String, dynamic> json) {
     return AgreementItem(
-      id: json['id'].toString(),
-      productId: json['product_id'].toString(),
-      itemName: json['products'] != null && json['products']['name'] != null
-          ? json['products']['name']
-          : 'منتج غير معروف',
-      totalQuantity: (json['total_quantity'] as num).toInt(),
-      receivedQuantitySoFar: (json['received_quantity_so_far'] as num? ?? 0)
-          .toInt(),
-      unitPrice: (json['unit_price'] as num).toDouble(),
-      expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']),
+      id: json['id'],
+      agreementId: json['agreement_id'], // -- تمت الإضافة --
+      product: json['products'] != null
+          ? ProductModel.fromJson(json['products'])
+          : null,
+      totalQuantity: (json['total_quantity'] as num?)?.toInt() ?? 0,
+      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
+      receivedQuantitySoFar:
+          (json['received_quantity_so_far'] as num?)?.toInt() ?? 0,
+      expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']), productId: "",
     );
   }
-
-  @override
-  List<Object?> get props => [id, productId, receivedQuantitySoFar];
 }

@@ -1,6 +1,7 @@
 // lib/features/suppliers/data/models/supplier_financials_model.dart
+import 'package:equatable/equatable.dart';
 
-// موديل لتخزين الملخص المالي (لا تغيير هنا)
+// نموذج للملخص المالي
 class SupplierFinancialSummary {
   final double totalAgreements;
   final double totalPaid;
@@ -14,38 +15,62 @@ class SupplierFinancialSummary {
 
   factory SupplierFinancialSummary.fromJson(Map<String, dynamic> json) {
     return SupplierFinancialSummary(
-      totalAgreements: (json['total_agreements'] as num? ?? 0).toDouble(),
-      totalPaid: (json['total_paid'] as num? ?? 0).toDouble(),
-      balance: (json['balance'] as num? ?? 0).toDouble(),
+      totalAgreements: (json['total_agreements'] as num?)?.toDouble() ?? 0.0,
+      totalPaid: (json['total_paid'] as num?)?.toDouble() ?? 0.0,
+      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
 
-// موديل لتمثيل دفعة واحدة
-class PaymentModel {
-  final String id;
+// نموذج لسجل الدفعات
+class PaymentModel extends Equatable {
+  final int id; // -- تمت الإضافة --
   final double amount;
   final DateTime paymentDate;
-  final String? notes;
   final String agreementId;
+  final String? notes;
 
-  PaymentModel({
-    required this.id,
+  const PaymentModel({
+    required this.id, // -- تمت الإضافة --
     required this.amount,
     required this.paymentDate,
-    this.notes,
     required this.agreementId,
+    this.notes,
   });
 
   factory PaymentModel.fromJson(Map<String, dynamic> json) {
     return PaymentModel(
-      // --- ** بداية الإصلاح ** ---
-      // تحويل المعرّفات إلى نص بشكل آمن لتجنب خطأ الأنواع
-      id: json['id'].toString(),
-      agreementId: json['agreement_id'].toString(),
-      // --- ** نهاية الإصلاح ** ---
-      amount: (json['paid_amount'] as num? ?? 0).toDouble(),
+      id: json['id'], // -- تمت الإضافة --
+      amount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
       paymentDate: DateTime.parse(json['payment_date']),
+      agreementId: json['agreement_id'].toString(),
+      notes: json['notes'],
+    );
+  }
+  
+  @override
+  List<Object?> get props => [id];
+}
+
+// نموذج جديد لسجل الاستلامات
+class ReceiptLogModel {
+  final String productName;
+  final int receivedQuantity;
+  final DateTime receiptDate;
+  final String? notes;
+
+  ReceiptLogModel({
+    required this.productName,
+    required this.receivedQuantity,
+    required this.receiptDate,
+    this.notes,
+  });
+
+  factory ReceiptLogModel.fromJson(Map<String, dynamic> json) {
+    return ReceiptLogModel(
+      productName: json['product_name'] ?? 'منتج غير محدد',
+      receivedQuantity: (json['received_quantity'] as num?)?.toInt() ?? 0,
+      receiptDate: DateTime.parse(json['receipt_date']),
       notes: json['notes'],
     );
   }

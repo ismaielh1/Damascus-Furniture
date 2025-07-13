@@ -4148,3 +4148,2004 @@ class _SuppliersListPageState extends ConsumerState<SuppliersListPage> {
 }
 
 
+--- FILE: lib/core/di/injector.dart ---
+import 'package:get_it/get_it.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+final getIt = GetIt.instance; Future<void> initializeDependencies() async {
+getIt.registerSingleton<SupabaseClient>(Supabase.instance.client);
+}
+
+
+--- FILE: lib/core/env/env.dart ---
+import 'package:envied/envied.dart';
+part 'env.g.dart';
+
+@Envied(path: '.env')
+abstract class Env {
+  @EnviedField(varName: 'SUPABASE_URL', obfuscate: true)
+  static final String supabaseUrl = _Env.supabaseUrl;
+  @EnviedField(varName: 'SUPABASE_ANON_KEY', obfuscate: true)
+  static final String supabaseAnonKey = _Env.supabaseAnonKey;
+}
+
+
+--- FILE: lib/core/env/env.g.dart ---
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'env.dart';
+
+// **************************************************************************
+// EnviedGenerator
+// **************************************************************************
+
+// coverage:ignore-file
+// ignore_for_file: type=lint
+// generated_from: .env
+final class _Env {
+  static const List<int> _enviedkeysupabaseUrl = <int>[
+    2463531231,
+    1694723662,
+    683904436,
+    1594825997,
+    3315599738,
+    3689412160,
+    1528127148,
+    2945304651,
+    4013258949,
+    3143384859,
+    3523039377,
+    1851814330,
+    1187720037,
+    157333184,
+    4125460894,
+    1730969630,
+    278236873,
+    4235749349,
+    1865302083,
+    4192607727,
+    1141372177,
+    1790086802,
+    1374391957,
+    1490413127,
+    557706187,
+    4042506460,
+    765950820,
+    2644243421,
+    3915840420,
+    3685812432,
+    3673930093,
+    2935021703,
+    2263807827,
+    3046292941,
+    2716791884,
+    2565260740,
+    609975117,
+    1161334521,
+    407381004,
+    1188746602,
+  ];
+
+  static const List<int> _envieddatasupabaseUrl = <int>[
+    2463531191,
+    1694723642,
+    683904448,
+    1594826109,
+    3315599625,
+    3689412218,
+    1528127107,
+    2945304676,
+    4013258943,
+    3143384958,
+    3523039482,
+    1851814364,
+    1187719955,
+    157333177,
+    4125460991,
+    1730969709,
+    278236849,
+    4235749256,
+    1865302059,
+    4192607620,
+    1141372280,
+    1790086901,
+    1374392060,
+    1490413097,
+    557706169,
+    4042506417,
+    765950729,
+    2644243372,
+    3915840394,
+    3685812387,
+    3673930008,
+    2935021815,
+    2263807794,
+    3046292911,
+    2716791853,
+    2565260727,
+    609975080,
+    1161334487,
+    407381103,
+    1188746501,
+  ];
+
+  static final String supabaseUrl = String.fromCharCodes(
+    List<int>.generate(
+      _envieddatasupabaseUrl.length,
+      (int i) => i,
+      growable: false,
+    ).map((int i) => _envieddatasupabaseUrl[i] ^ _enviedkeysupabaseUrl[i]),
+  );
+
+  static const List<int> _enviedkeysupabaseAnonKey = <int>[
+    807083853,
+    1816422719,
+    2593874868,
+    1871648388,
+    2529432447,
+    583140877,
+    2464789180,
+    30214647,
+    1872621588,
+    3900849903,
+    4284681824,
+    1993942960,
+    1519891544,
+    1262974306,
+    643866366,
+    1103318555,
+    615062467,
+    1650986810,
+    551858208,
+    989793610,
+    4198496462,
+    571001414,
+    152289305,
+    1286881879,
+    2163643579,
+    2390787688,
+    3381812446,
+    2663820475,
+    2990747861,
+    254325969,
+    2115952713,
+    1381555260,
+    3815364127,
+    464285689,
+    782875150,
+    2888992571,
+    4015012084,
+    2609167000,
+    2885835992,
+    3056930495,
+    750852615,
+    2557022641,
+    2948036241,
+    361909718,
+    928955644,
+    1962126502,
+    2846054124,
+    1628309696,
+    1537824916,
+    2928222820,
+    2162961463,
+    2001943634,
+    2401523796,
+    3639792657,
+    2249945414,
+    2922895848,
+    885279003,
+    3006817168,
+    1572157759,
+    363697134,
+    1109159834,
+    3258113389,
+    3432010201,
+    917230997,
+    2052290554,
+    2978841062,
+    3340688851,
+    1022378847,
+    595813844,
+    3419318855,
+    4072441818,
+    2428758048,
+    3121728250,
+    2502852306,
+    3666432448,
+    691424754,
+    1459234816,
+    575207900,
+    4198174852,
+    768929163,
+    2467382265,
+    38601969,
+    2301648943,
+    293944199,
+    1876980669,
+    3415729266,
+    2802781727,
+    1265148102,
+    616302358,
+    677230619,
+    1694630445,
+    1187472944,
+    2591363338,
+    2986498432,
+    4201039369,
+    585031193,
+    1564697313,
+    2803979353,
+    3396735474,
+    3157311301,
+    3670834770,
+    4241388101,
+    2054000449,
+    1919308582,
+    2703612069,
+    422966547,
+    3038791922,
+    1304940275,
+    3111829616,
+    395097787,
+    2518910489,
+    3926899472,
+    3083976537,
+    1061226486,
+    892904173,
+    82343164,
+    4166417693,
+    3266347573,
+    1052882823,
+    1244630958,
+    3867280008,
+    1415736851,
+    333970597,
+    4195965165,
+    2463032143,
+    3917203900,
+    2169824448,
+    2097226015,
+    2684149831,
+    2735080711,
+    288854977,
+    2777192701,
+    652586980,
+    2943404318,
+    144387075,
+    2326521840,
+    1957668095,
+    2000063790,
+    948629104,
+    4107366640,
+    2710713732,
+    380699169,
+    1589993440,
+    1207065227,
+    2547466588,
+    1234015083,
+    1298203011,
+    3276961979,
+    2139632440,
+    2836786596,
+    219001857,
+    891720845,
+    3286401564,
+    3246882125,
+    429254307,
+    3694177249,
+    292907283,
+    734034792,
+    2606136155,
+    3451161893,
+    186348429,
+    2740451458,
+    3052913127,
+    1816625697,
+    1972813893,
+    2579310387,
+    478684941,
+    3206000859,
+    4061146957,
+    1025478916,
+    3549518009,
+    962238289,
+    2543161850,
+    454162834,
+    3378799533,
+    1286517100,
+    963256554,
+    4202039611,
+    947239363,
+    1163162475,
+    773217848,
+    3857248114,
+    21713974,
+    4044949003,
+    265367733,
+    2510904029,
+    3329942950,
+    342457617,
+    4162734071,
+    487567850,
+    2437835933,
+    3455691597,
+    3186684941,
+    2635624950,
+    2840350949,
+    1595564299,
+    2628761266,
+    896757913,
+    2055908173,
+    798737895,
+    126938105,
+    1506272099,
+    2797842428,
+    3048817224,
+    3403404030,
+    79909392,
+    3737662556,
+    697847101,
+  ];
+
+  static const List<int> _envieddatasupabaseAnonKey = <int>[
+    807083816,
+    1816422726,
+    2593874942,
+    1871648492,
+    2529432349,
+    583140938,
+    2464789215,
+    30214558,
+    1872621659,
+    3900849798,
+    4284681770,
+    1993943033,
+    1519891469,
+    1262974232,
+    643866295,
+    1103318570,
+    615062413,
+    1650986835,
+    551858281,
+    989793593,
+    4198496391,
+    571001384,
+    152289355,
+    1286881890,
+    2163643608,
+    2390787627,
+    3381812375,
+    2663820429,
+    2990747804,
+    254325946,
+    2115952697,
+    1381555300,
+    3815364169,
+    464285626,
+    782875204,
+    2888992514,
+    4015012058,
+    2609167101,
+    2885835937,
+    3056930549,
+    750852727,
+    2557022674,
+    2948036258,
+    361909659,
+    928955541,
+    1962126569,
+    2846054021,
+    1628309642,
+    1537825006,
+    2928222720,
+    2162961519,
+    2001943568,
+    2401523772,
+    3639792712,
+    2249945387,
+    2922895790,
+    885279073,
+    3006817226,
+    1572157804,
+    363697063,
+    1109159913,
+    3258113316,
+    3432010167,
+    917231071,
+    2052290454,
+    2978841020,
+    3340688826,
+    1022378774,
+    595813858,
+    3419318798,
+    4072441780,
+    2428758096,
+    3121728150,
+    2502852275,
+    3666432498,
+    691424680,
+    1459234866,
+    575207865,
+    4198174931,
+    768929229,
+    2467382147,
+    38601876,
+    2301649000,
+    293944246,
+    1876980690,
+    3415729171,
+    2802781741,
+    1265148074,
+    616302456,
+    677230714,
+    1694630522,
+    1187472901,
+    2591363443,
+    2986498530,
+    4201039454,
+    585031208,
+    1564697241,
+    2803979280,
+    3396735387,
+    3157311282,
+    3670834747,
+    4241388070,
+    2054000428,
+    1919308575,
+    2703612118,
+    422966601,
+    3038791841,
+    1304940218,
+    3111829574,
+    395097842,
+    2518910580,
+    3926899542,
+    3083976492,
+    1061226388,
+    892904159,
+    82343112,
+    4166417780,
+    3266347641,
+    1052882884,
+    1244631012,
+    3867280120,
+    1415736906,
+    333970685,
+    4195965116,
+    2463032102,
+    3917203955,
+    2169824426,
+    2097226074,
+    2684149876,
+    2735080777,
+    288854933,
+    2777192636,
+    652586909,
+    2943404371,
+    144387143,
+    2326521777,
+    1957668046,
+    2000063840,
+    948629018,
+    4107366589,
+    2710713847,
+    380699240,
+    1589993357,
+    1207065309,
+    2547466600,
+    1234014984,
+    1298203072,
+    3276962034,
+    2139632398,
+    2836786665,
+    219001963,
+    891720908,
+    3286401582,
+    3246882051,
+    429254391,
+    3694177154,
+    292907296,
+    734034726,
+    2606136113,
+    3451161968,
+    186348479,
+    2740451535,
+    3052913108,
+    1816625681,
+    1972813931,
+    2579310347,
+    478685044,
+    3206000778,
+    4061146926,
+    1025479021,
+    3549518017,
+    962238210,
+    2543161791,
+    454162919,
+    3378799608,
+    1286517054,
+    963256450,
+    4202039674,
+    947239333,
+    1163162376,
+    773217879,
+    3857248045,
+    21714035,
+    4044949058,
+    265367681,
+    2510903946,
+    3329942995,
+    342457683,
+    4162733958,
+    487567744,
+    2437835978,
+    3455691562,
+    3186685034,
+    2635624860,
+    2840350933,
+    1595564372,
+    2628761315,
+    896758011,
+    2055908223,
+    798737866,
+    126937996,
+    1506272090,
+    2797842359,
+    3048817158,
+    3403403981,
+    79909467,
+    3737662572,
+    697847144,
+  ];
+
+  static final String supabaseAnonKey = String.fromCharCodes(
+    List<int>.generate(
+      _envieddatasupabaseAnonKey.length,
+      (int i) => i,
+      growable: false,
+    ).map(
+      (int i) => _envieddatasupabaseAnonKey[i] ^ _enviedkeysupabaseAnonKey[i],
+    ),
+  );
+}
+
+
+--- FILE: lib/core/models/models.dart ---
+// lib/core/models/models.dart
+
+import 'package:flutter/material.dart';
+// import 'package:my_store_app/l10n/app_localizations.dart'; // سنعيد تفعيله لاحقًا
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// يحدد نوع الوجهة التي يجب أن ينتقل إليها البانر عند النقر عليه.
+enum BannerTargetType {
+  product,   // يوجه إلى صفحة منتج معين
+  category,  // يوجه إلى صفحة فئة معينة
+  search,    // يوجه إلى نتائج بحث معينة
+  none,      // البانر غير قابل للنقر
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+/// نموذج بيانات الفئة (مثل: إلكترونيات، أزياء، مستلزمات المنزل).
+class Category {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String imageUrl; // صورة كبيرة للفئة
+  final String? parentCategoryId; // لدعم الفئات الفرعية مستقبلاً (e.g., 'ملابس' -> 'رجال')
+
+  Category({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.imageUrl,
+    this.parentCategoryId,
+  });
+
+  /// الحصول على الاسم المترجم بناءً على لغة التطبيق الحالية.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+}
+
+/// نموذج بيانات المنتج، مع إضافة حقول جديدة.
+class Product {
+  final String id;
+  final String nameAr;
+  final String nameEn;
+  final String productNumber;
+  final double price; // السعر بالدولار الأمريكي
+  final String descriptionAr;
+  final String descriptionEn;
+  final List<String> imageUrls; // قائمة بالصور لعرضها في معرض صور
+  final String categoryId; // لربط المنتج بالفئة التي ينتمي إليها
+  final String? brand; // ماركة المنتج (اختياري)
+  final List<String>? tags; // كلمات مفتاحية للبحث (اختياري)
+
+  Product({
+    required this.id,
+    required this.nameAr,
+    required this.nameEn,
+    required this.productNumber,
+    required this.price,
+    required this.descriptionAr,
+    required this.descriptionEn,
+    required this.imageUrls,
+    required this.categoryId,
+    this.brand,
+    this.tags,
+  });
+
+  /// الحصول على الاسم المترجم.
+  String getLocalizedName(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? nameAr : nameEn;
+  }
+
+  /// الحصول على الوصف المترجم.
+  String getLocalizedDescription(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'ar' ? descriptionAr : descriptionEn;
+  }
+}
+
+/// نموذج بيانات البانر الإعلاني للشاشة الرئيسية.
+class BannerAd {
+  final String id;
+  final String imageUrl;
+  final BannerTargetType targetType; // نوع الوجهة
+  final String? targetId; // معرّف المنتج أو الفئة أو كلمة البحث
+
+  BannerAd({
+    required this.id,
+    required this.imageUrl,
+    this.targetType = BannerTargetType.none,
+    this.targetId,
+  });
+}
+
+/// نموذج بيانات المستخدم (كما هو من قبل، مع الحقول الأساسية).
+class AppUser {
+  final String uid;
+  final String? email;
+  final String? name;
+  final String? profileImageUrl;
+  final bool isAdmin;
+  final String? locale;
+  final String? address;
+
+  AppUser({
+    required this.uid,
+    this.email,
+    this.name,
+    this.profileImageUrl,
+    this.isAdmin = false,
+    this.locale,
+    this.address,
+  });
+}
+
+
+/// نموذج بيانات عنصر السلة (كما هو من قبل).
+class CartItem {
+  final Product product;
+  int quantity;
+
+  CartItem({required this.product, this.quantity = 1});
+}
+
+
+--- FILE: lib/core/models/rive_model.dart ---
+// lib/core/models/rive_model.dart
+
+import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
+
+class RiveUtils {
+  static StateMachineController getRiveController(Artboard artboard, {String? stateMachineName}) {
+    StateMachineController? controller = StateMachineController.fromArtboard(artboard, stateMachineName ?? 'State Machine 1');
+    if (controller == null) {
+      throw Exception('Could not find Rive StateMachineController');
+    }
+    artboard.addController(controller);
+    return controller;
+  }
+}
+
+class RiveModel {
+  final String src;
+  final String artboard;
+  final String stateMachineName;
+  final String title;
+  late SMIBool? input;
+
+  RiveModel({
+    required this.src,
+    required this.artboard,
+    required this.stateMachineName,
+    required this.title,
+  });
+
+  set setInput(SMIBool status) {
+    input = status;
+  }
+}
+
+
+--- FILE: lib/core/services/supabase_service.dart ---
+// lib/core/services/supabase_service.dart
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syria_store/core/models/models.dart';
+
+class SupabaseService {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  // --- الدالة الجديدة ---
+  /// جلب بيانات AppUser من جدول users باستخدام uid
+  Future<AppUser?> getUserData(String uid) async {
+    try {
+      final data = await _client.from('users').select().eq('id', uid).single();
+      // تحويل الـ Map إلى كائن AppUser
+      return AppUser(
+        uid: data['id'],
+        email: data['email'],
+        name: data['name'],
+        profileImageUrl: data['profile_image_url'],
+        isAdmin: data['is_admin'] ?? false,
+        locale: data['locale'],
+        address: data['address'],
+      );
+    } catch (e) {
+      // قد لا يكون المستخدم موجودًا في جدولنا بعد، أو قد يحدث خطأ
+      print('Error getting user data: $e');
+      return null;
+    }
+  }
+  // --- نهاية الدالة الجديدة ---
+  
+  Future<Product> getProductById(String productId) async {
+    try {
+      final response = await _client.from('products').select().eq('id', productId).single();
+      return Product(
+        id: response['id'].toString(), nameAr: response['name_ar'], nameEn: response['name_en'],
+        productNumber: response['product_number'], price: (response['price'] as num).toDouble(),
+        descriptionAr: response['description_ar'], descriptionEn: response['description_en'],
+        imageUrls: List<String>.from(response['image_urls']), categoryId: response['category_id'].toString(),
+        brand: response['brand'], tags: List<String>.from(response['tags'] ?? []),
+      );
+    } catch (e) {
+      print('Error getting product by ID from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _client.from('products').select().eq('category_id', categoryId);
+      return response.map((item) => Product(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        productNumber: item['product_number'], price: (item['price'] as num).toDouble(),
+        descriptionAr: item['description_ar'], descriptionEn: item['description_en'],
+        imageUrls: List<String>.from(item['image_urls']), categoryId: item['category_id'].toString(),
+        brand: item['brand'], tags: List<String>.from(item['tags'] ?? []),
+      )).toList();
+    } catch (e) {
+      print('Error getting products by category from Supabase: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Category>> getCategories() async {
+    try {
+      final response = await _client.from('categories').select();
+      return response.map((item) => Category(
+        id: item['id'].toString(), nameAr: item['name_ar'], nameEn: item['name_en'],
+        imageUrl: item['image_url'], parentCategoryId: item['parent_category_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting categories from Supabase: $e');
+      rethrow;
+    }
+  }
+  
+  Future<List<BannerAd>> getBanners() async {
+    try {
+      final response = await _client.from('banners').select();
+      return response.map((item) => BannerAd(
+        id: item['id'].toString(), imageUrl: item['image_url'],
+        targetType: BannerTargetType.values.byName(item['target_type'] ?? 'none'),
+        targetId: item['target_id']?.toString(),
+      )).toList();
+    } catch (e) {
+      print('Error getting banners from Supabase: $e');
+      rethrow;
+    }
+  }
+}
+
+
+--- FILE: lib/core/theme/app_colors.dart ---
+// lib/core/theme/app_colors.dart
+
+import 'package:flutter/material.dart';
+
+class AppColors {
+  // --- لوحة الألوان الجديدة ---
+  static const Color primary = Color(0xFF0D47A1);   // أزرق داكن وأنيق
+  static const Color secondary = Color(0xFF00BCD4);  // سماوي/تركواز حيوي
+  
+  // ألوان الخلفيات والأسطح
+  static const Color background = Color(0xFFF4F6F8); // رمادي فاتح جدًا ومريح
+  static const Color surface = Colors.white;
+
+  // ألوان النصوص
+  static const Color textPrimary = Color(0xFF1A2536); // أسود غير حاد
+  static const Color textSecondary = Color(0xFF707070); // رمادي للنصوص الثانوية
+
+  // ألوان أخرى
+  static const Color error = Color(0xFFD32F2F);
+  static const Color success = Color(0xFF388E3C);
+  static const Color white = Colors.white;
+}
+
+
+--- FILE: lib/core/theme/app_theme.dart ---
+// lib/core/theme/app_theme.dart
+
+import 'package:flutter/material.dart';
+import 'package:syria_store/core/theme/app_colors.dart';
+
+class AppTheme {
+  static final ThemeData lightTheme = ThemeData(
+    useMaterial3: true,
+    fontFamily: 'Poppins',
+    primaryColor: AppColors.primary,
+    scaffoldBackgroundColor: AppColors.background,
+
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      primary: AppColors.primary,
+      secondary: AppColors.secondary,
+      background: AppColors.background,
+      surface: AppColors.surface,
+      error: AppColors.error,
+      brightness: Brightness.light,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      elevation: 1.0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.w600),
+    ),
+
+    cardTheme: CardThemeData(
+      elevation: 1.0,
+      shadowColor: Colors.black12,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+      ),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    ),
+
+    textTheme: const TextTheme(
+      headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+      bodyLarge: TextStyle(color: AppColors.textPrimary, height: 1.5),
+      bodyMedium: TextStyle(color: AppColors.textSecondary),
+    ),
+  );
+}
+
+
+--- FILE: lib/core/utils/downloader.dart ---
+// هذا الملف هو الحل البديل للموبايل، لكنه لن يعمل على الأجهزة الحقيقية بدون إعدادات إضافية.
+// سنركز على عمله على الويب حالياً.
+Future<void> saveAndLaunchFile(List<int> bytes, String fileName) async {
+  throw 'Platform not supported';
+}
+
+
+--- FILE: lib/core/utils/downloader_web.dart ---
+import 'dart:html' as html;
+import 'dart:typed_data';
+
+Future<void> saveAndLaunchFile(List<int> bytes, String fileName) async {
+  final blob = html.Blob([
+    Uint8List.fromList(bytes),
+  ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute("download", fileName)
+    ..click();
+  html.Url.revokeObjectUrl(url);
+}
+
+
+--- FILE: lib/features/admin/presentation/pages/admin_panel_page.dart ---
+// lib/features/admin/presentation/pages/admin_panel_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class AdminPanelPage extends ConsumerWidget {
+  const AdminPanelPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة تحكم المسؤول'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // قائمة بالوظائف الإدارية
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined),
+            title: const Text('إدارة المنتجات'),
+            subtitle: const Text('إضافة، تعديل، وحذف المنتجات'),
+            onTap: () {
+              // TODO: Navigate to Manage Products screen
+              print('Navigate to Manage Products');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('إدارة الفئات'),
+            subtitle: const Text('إضافة، تعديل، وحذف الفئات'),
+            onTap: () {
+              // TODO: Navigate to Manage Categories screen
+              print('Navigate to Manage Categories');
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.view_carousel_outlined),
+            title: const Text('إدارة البانرات'),
+            subtitle: const Text('إضافة، تعديل، وحذف البانرات الإعلانية'),
+            onTap: () {
+              // TODO: Navigate to Manage Banners screen
+              print('Navigate to Manage Banners');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/auth/presentation/providers/auth_providers.dart ---
+// // lib/features/auth/presentation/providers/auth_providers.dart
+
+// import 'package:riverpod/riverpod.dart';
+// import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:syria_store/core/models/models.dart';
+// import 'package:syria_store/features/home/presentation/providers/home_providers.dart';
+
+// // هذا الـ Provider يراقب حالة المصادقة في Supabase
+// final authStateProvider = StreamProvider<AuthState>((ref) {
+//   return Supabase.instance.client.auth.onAuthStateChange;
+// });
+
+// // هذا الـ Provider يجلب بيانات AppUser للمستخدم المسجل دخوله حاليًا
+// final currentUserProvider = FutureProvider<AppUser?>((ref) async {
+//   // نراقب حالة المصادقة
+//   final authState = ref.watch(authStateProvider);
+//   final supabaseService = ref.watch(supabaseServiceProvider);
+
+//   // إذا كان هناك مستخدم مسجل دخوله، نجلب بياناته من جدول users
+//   final user = authState.value?.session?.user;
+//   if (user != null) {
+//     return await supabaseService.getUserData(user.id);
+//   }
+//   return null;
+// });
+
+
+--- FILE: lib/features/branches/data/models/branch_model.dart ---
+// lib/features/branches/data/models/branch_model.dart
+import 'package:equatable/equatable.dart';
+
+class BranchModel extends Equatable {
+  final String id;
+  final String name;
+  final String? address;
+  final String? phoneNumber;
+  final bool isMain;
+
+  const BranchModel({
+    required this.id,
+    required this.name,
+    this.address,
+    this.phoneNumber,
+    required this.isMain,
+  });
+
+  factory BranchModel.fromJson(Map<String, dynamic> json) {
+    return BranchModel(
+      id: json['id'],
+      name: json['name'],
+      address: json['address'],
+      phoneNumber: json['phone_number'],
+      isMain: json['is_main'] ?? false,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id];
+}
+
+
+--- FILE: lib/features/branches/presentation/dialogs/add_edit_branch_dialog.dart ---
+// lib/features/branches/presentation/dialogs/add_edit_branch_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/branches/data/models/branch_model.dart';
+import 'package:syria_store/features/branches/presentation/providers/branches_provider.dart';
+
+class AddEditBranchDialog extends ConsumerStatefulWidget {
+  final BranchModel? branch;
+  const AddEditBranchDialog({super.key, this.branch});
+
+  @override
+  ConsumerState<AddEditBranchDialog> createState() =>
+      _AddEditBranchDialogState();
+}
+
+class _AddEditBranchDialogState extends ConsumerState<AddEditBranchDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _addressController;
+  late TextEditingController _phoneController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.branch?.name ?? '');
+    _addressController = TextEditingController(
+      text: widget.branch?.address ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.branch?.phoneNumber ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      final notifier = ref.read(branchControllerProvider.notifier);
+      final future = widget.branch == null
+          ? notifier.addBranch(
+              context,
+              name: _nameController.text.trim(),
+              address: _addressController.text.trim(),
+              phone: _phoneController.text.trim(),
+            )
+          : notifier.updateBranch(
+              context,
+              id: widget.branch!.id,
+              name: _nameController.text.trim(),
+              address: _addressController.text.trim(),
+              phone: _phoneController.text.trim(),
+            );
+
+      future.then((success) {
+        if (success && mounted) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(branchControllerProvider);
+    final isEditing = widget.branch != null;
+
+    return AlertDialog(
+      title: Text(isEditing ? 'تعديل فرع' : 'إضافة فرع جديد'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'اسم الفرع'),
+              validator: (val) =>
+                  (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'العنوان (اختياري)'),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'رقم الهاتف (اختياري)',
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading ? null : _onSave,
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/branches/presentation/pages/branches_list_page.dart ---
+// lib/features/branches/presentation/pages/branches_list_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/branches/presentation/dialogs/add_edit_branch_dialog.dart';
+import 'package:syria_store/features/branches/presentation/providers/branches_provider.dart';
+
+class BranchesListPage extends ConsumerWidget {
+  const BranchesListPage({super.key});
+
+  void _showAddEditDialog(BuildContext context, {branch}) {
+    showDialog(
+      context: context,
+      builder: (_) => AddEditBranchDialog(branch: branch),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branchesAsync = ref.watch(branchesProvider);
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        // -- بداية الإضافة --
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        // -- نهاية الإضافة --
+        title: const Text('إدارة الفروع'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddEditDialog(context),
+        child: const Icon(Icons.add),
+        tooltip: 'إضافة فرع جديد',
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(branchesProvider.future),
+        child: branchesAsync.when(
+          data: (branches) {
+            if (branches.isEmpty) {
+              return const Center(
+                child: Text('لا توجد فروع. قم بإضافة فرع جديد.'),
+              );
+            }
+            return ListView.builder(
+              itemCount: branches.length,
+              itemBuilder: (context, index) {
+                final branch = branches[index];
+                return Card(
+                  color: branch.isMain ? Colors.blue.shade50 : null,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      branch.isMain ? Icons.star : Icons.storefront_outlined,
+                      color: branch.isMain
+                          ? Colors.amber.shade700
+                          : Colors.grey,
+                    ),
+                    title: Text(
+                      branch.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(branch.address ?? 'لا يوجد عنوان'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!branch.isMain)
+                          IconButton(
+                            icon: const Icon(Icons.star_border_outlined),
+                            onPressed: () => ref
+                                .read(branchControllerProvider.notifier)
+                                .setMainBranch(context, branch.id),
+                            tooltip: 'جعله الفرع الرئيسي',
+                          ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: Colors.blueGrey,
+                          ),
+                          onPressed: () =>
+                              _showAddEditDialog(context, branch: branch),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('حدث خطأ: $e')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/branches/presentation/providers/branches_provider.dart ---
+// lib/features/branches/presentation/providers/branches_provider.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/branches/data/models/branch_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+// Provider لجلب كل الفروع
+final branchesProvider = FutureProvider.autoDispose<List<BranchModel>>((
+  ref,
+) async {
+  final supabase = ref.watch(supabaseProvider);
+  // الترتيب لإظهار الفرع الرئيسي أولاً
+  final response = await supabase
+      .from('branches')
+      .select()
+      .order('is_main', ascending: false)
+      .order('created_at');
+  return response.map((item) => BranchModel.fromJson(item)).toList();
+});
+
+// Provider للتحكم في عمليات الإضافة والتعديل وتحديد الفرع الرئيسي
+final branchControllerProvider =
+    StateNotifierProvider.autoDispose<BranchController, bool>((ref) {
+      return BranchController(ref: ref);
+    });
+
+class BranchController extends StateNotifier<bool> {
+  final Ref _ref;
+  BranchController({required Ref ref}) : _ref = ref, super(false);
+
+  Future<bool> addBranch(
+    BuildContext context, {
+    required String name,
+    String? address,
+    String? phone,
+  }) async {
+    state = true;
+    try {
+      await _ref.read(supabaseProvider).from('branches').insert({
+        'name': name,
+        'address': address,
+        'phone_number': phone,
+      });
+      _ref.invalidate(branchesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تمت إضافة الفرع بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل إضافة الفرع: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+
+  Future<bool> updateBranch(
+    BuildContext context, {
+    required String id,
+    required String name,
+    String? address,
+    String? phone,
+  }) async {
+    state = true;
+    try {
+      await _ref
+          .read(supabaseProvider)
+          .from('branches')
+          .update({'name': name, 'address': address, 'phone_number': phone})
+          .eq('id', id);
+      _ref.invalidate(branchesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحديث الفرع بنجاح'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل تحديث الفرع: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+
+  Future<void> setMainBranch(BuildContext context, String branchId) async {
+    try {
+      await _ref
+          .read(supabaseProvider)
+          .rpc('set_main_branch', params: {'p_branch_id': branchId});
+      _ref.invalidate(branchesProvider);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل تحديد الفرع الرئيسي: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+}
+
+// -- بداية الإضافة --
+// Provider لحفظ الفرع الذي تم اختياره حالياً للعمل عليه
+final selectedBranchProvider = StateProvider<BranchModel?>((ref) => null);
+// -- نهاية الإضافة --
+
+
+--- FILE: lib/features/categories/data/models/category_model.dart ---
+class CategoryModel {
+  final int id;
+  final String name;
+
+  CategoryModel({
+    required this.id,
+    required this.name,
+  });
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: json['id'],
+      name: json['name'],
+    );
+  }
+}
+
+
+--- FILE: lib/features/categories/presentation/dialogs/add_edit_category_dialog.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/categories/presentation/providers/category_provider.dart';
+
+class AddEditCategoryDialog extends ConsumerStatefulWidget {
+  const AddEditCategoryDialog({super.key});
+
+  @override
+  ConsumerState<AddEditCategoryDialog> createState() => _AddEditCategoryDialogState();
+}
+
+class _AddEditCategoryDialogState extends ConsumerState<AddEditCategoryDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      ref.read(categoryControllerProvider.notifier)
+          .addCategory(context, _nameController.text.trim())
+          .then((success) {
+            if (success && mounted) {
+              Navigator.of(context).pop();
+            }
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(categoryControllerProvider);
+    return AlertDialog(
+      title: const Text('إضافة تصنيف جديد'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _nameController,
+          decoration: const InputDecoration(labelText: 'اسم التصنيف'),
+          validator: (val) => (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
+        ElevatedButton(
+          onPressed: isLoading ? null : _onSave,
+          child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/categories/presentation/pages/categories_list_page.dart ---
+// lib/features/categories/presentation/pages/categories_list_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/categories/presentation/dialogs/add_edit_category_dialog.dart';
+import 'package:syria_store/features/categories/presentation/providers/category_provider.dart';
+
+class CategoriesListPage extends ConsumerWidget {
+  const CategoriesListPage({super.key});
+
+  void _showAddCategoryDialog(BuildContext context) {
+    showDialog(context: context, builder: (_) => const AddEditCategoryDialog());
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categoriesAsync = ref.watch(categoriesProvider);
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        // -- بداية الإضافة --
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        // -- نهاية الإضافة --
+        title: const Text('إدارة التصنيفات'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddCategoryDialog(context),
+        child: const Icon(Icons.add),
+        tooltip: 'إضافة تصنيف جديد',
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(categoriesProvider.future),
+        child: categoriesAsync.when(
+          data: (categories) {
+            if (categories.isEmpty) {
+              return const Center(
+                child: Text('لا توجد تصنيفات. قم بإضافة تصنيف جديد.'),
+              );
+            }
+            return ListView.builder(
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final category = categories[index];
+                return ListTile(
+                  title: Text(category.name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () {},
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: Colors.red.shade700,
+                        ),
+                        onPressed: () {},
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('حدث خطأ: $e')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/categories/presentation/providers/category_provider.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/categories/data/models/category_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+final categoriesProvider = FutureProvider.autoDispose<List<CategoryModel>>((ref) async {
+  final supabase = ref.watch(supabaseProvider);
+  final response = await supabase.from('supplier_categories').select().order('name');
+  return response.map((item) => CategoryModel.fromJson(item)).toList();
+});
+
+final categoryControllerProvider = StateNotifierProvider.autoDispose<CategoryController, bool>((ref) {
+  return CategoryController(ref: ref);
+});
+
+class CategoryController extends StateNotifier<bool> {
+  final Ref ref;
+  CategoryController({required this.ref}) : super(false);
+
+  Future<bool> addCategory(BuildContext context, String name) async {
+    state = true;
+    try {
+      await ref.read(supabaseProvider).from('supplier_categories').insert({'name': name});
+      ref.invalidate(categoriesProvider);
+      ref.invalidate(supplierCategoriesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة التصنيف بنجاح'), backgroundColor: Colors.green));
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل إضافة التصنيف: $e'), backgroundColor: Colors.red));
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/customers/presentation/dialogs/add_edit_customer_dialog.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/customers/presentation/providers/customers_provider.dart';
+
+class AddEditCustomerDialog extends ConsumerStatefulWidget {
+  const AddEditCustomerDialog({super.key});
+
+  @override
+  ConsumerState<AddEditCustomerDialog> createState() =>
+      _AddEditCustomerDialogState();
+}
+
+class _AddEditCustomerDialogState extends ConsumerState<AddEditCustomerDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      ref.read(customerControllerProvider.notifier).addCustomer(
+            context: context,
+            name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+            address: _addressController.text.trim(),
+          ).then((success) {
+            if (success && mounted) {
+              Navigator.of(context).pop();
+            }
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(customerControllerProvider);
+    return AlertDialog(
+      title: const Text('إضافة عميل جديد'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'اسم العميل'),
+              validator: (val) =>
+                  (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: 'رقم الهاتف (اختياري)'),
+              keyboardType: TextInputType.phone,
+            ),
+             const SizedBox(height: 16),
+            TextFormField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'العنوان (اختياري)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء')),
+        ElevatedButton(
+          onPressed: isLoading ? null : _onSave,
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/customers/presentation/pages/customers_list_page.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/customers/presentation/dialogs/add_edit_customer_dialog.dart';
+import 'package:syria_store/features/customers/presentation/providers/customers_provider.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+
+
+class CustomersListPage extends ConsumerStatefulWidget {
+  const CustomersListPage({super.key});
+
+  @override
+  ConsumerState<CustomersListPage> createState() => _CustomersListPageState();
+}
+
+class _CustomersListPageState extends ConsumerState<CustomersListPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(customerSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _showAddCustomerDialog(BuildContext context) {
+    showDialog(context: context, builder: (_) => const AddEditCustomerDialog());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customersAsync = ref.watch(allCustomersProvider);
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(title: const Text('قائمة العملاء')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddCustomerDialog(context),
+        child: const Icon(Icons.add),
+        tooltip: 'إضافة عميل جديد',
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ابحث عن عميل بالاسم أو الرقم...',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                ref.read(customerSearchQueryProvider.notifier).state = value;
+              },
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(allCustomersProvider.future),
+              child: customersAsync.when(
+                data: (customers) {
+                  if (customers.isEmpty) {
+                    return const Center(
+                      child: Text('لا يوجد عملاء. قم بإضافة عميل جديد.'),
+                    );
+                  }
+                  return ListView.builder(
+                    itemCount: customers.length,
+                    itemBuilder: (context, index) {
+                      final customer = customers[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: Text(customer.name.isNotEmpty ? customer.name[0] : '?'),
+                          ),
+                          title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(customer.phoneNumber ?? 'لا يوجد رقم هاتف'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: () {
+                            // لاحقاً: سننتقل إلى صفحة سجل العميل
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) => Center(child: Text('حدث خطأ: $e')),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/customers/presentation/providers/customers_provider.dart ---
+// lib/features/customers/presentation/providers/customers_provider.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+final customerSearchQueryProvider = StateProvider<String>((ref) => '');
+
+// Provider لجلب كل العملاء (يظل مفيداً لصفحة قائمة العملاء)
+final allCustomersProvider = FutureProvider.autoDispose<List<ContactModel>>((
+  ref,
+) async {
+  final supabase = ref.watch(supabaseProvider);
+  final searchQuery = ref.watch(customerSearchQueryProvider);
+
+  try {
+    var query = supabase.from('contacts').select().eq('is_customer', true);
+
+    if (searchQuery.isNotEmpty) {
+      query = query.or(
+        'name.ilike.%$searchQuery%,code.ilike.%$searchQuery%,phone_number.ilike.%$searchQuery%',
+      );
+    }
+
+    final response = await query.order('name', ascending: true);
+    return response.map((item) => ContactModel.fromJson(item)).toList();
+  } catch (e) {
+    print('Error fetching customers: $e');
+    rethrow;
+  }
+});
+
+// -- بداية الإضافة: Provider جديد للبحث التفاعلي في حقل الإكمال التلقائي --
+final customerAutocompleteProvider = FutureProvider.autoDispose
+    .family<List<ContactModel>, String>((ref, query) async {
+      if (query.isEmpty) {
+        return [];
+      }
+      final supabase = ref.watch(supabaseProvider);
+      try {
+        final response = await supabase
+            .from('contacts')
+            .select()
+            .eq('is_customer', true)
+            .or('name.ilike.%$query%,phone_number.ilike.%$query%')
+            .limit(10); // نحدد عدد النتائج لتخفيف العبء
+        return response.map((item) => ContactModel.fromJson(item)).toList();
+      } catch (e) {
+        print('Error during customer autocomplete search: $e');
+        return [];
+      }
+    });
+// -- نهاية الإضافة --
+
+final customerControllerProvider =
+    StateNotifierProvider.autoDispose<CustomerController, bool>((ref) {
+      return CustomerController(ref: ref);
+    });
+
+class CustomerController extends StateNotifier<bool> {
+  final Ref _ref;
+  CustomerController({required Ref ref}) : _ref = ref, super(false);
+
+  Future<bool> addCustomer({
+    required BuildContext context,
+    required String name,
+    String? phone,
+    String? address,
+  }) async {
+    if (state) return false;
+    state = true;
+    try {
+      await _ref
+          .read(supabaseProvider)
+          .rpc(
+            'add_contact',
+            params: {
+              'p_name': name,
+              'p_phone_number': phone,
+              'p_address': address,
+              'p_is_supplier': false,
+              'p_is_customer': true,
+              'p_category_id': null,
+            },
+          );
+      _ref.invalidate(allCustomersProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تمت إضافة العميل "$name" بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في إضافة العميل: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/employees/presentation/dialogs/add_edit_employee_dialog.dart ---
+// lib/features/employees/presentation/dialogs/add_edit_employee_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/presentation/providers/employees_provider.dart';
+
+class AddEditEmployeeDialog extends ConsumerStatefulWidget {
+  const AddEditEmployeeDialog({super.key});
+
+  @override
+  ConsumerState<AddEditEmployeeDialog> createState() =>
+      _AddEditEmployeeDialogState();
+}
+
+class _AddEditEmployeeDialogState extends ConsumerState<AddEditEmployeeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      ref
+          .read(employeeControllerProvider.notifier)
+          .addEmployee(context, fullName: _nameController.text.trim())
+          .then((success) {
+            if (success) Navigator.of(context).pop();
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(employeeControllerProvider);
+    return AlertDialog(
+      title: const Text('إضافة موظف جديد'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _nameController,
+          decoration: const InputDecoration(labelText: 'الاسم الكامل للموظف'),
+          validator: (val) => val == null || val.isEmpty ? 'الحقل مطلوب' : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: isLoading ? null : _onSave,
+          child: isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+

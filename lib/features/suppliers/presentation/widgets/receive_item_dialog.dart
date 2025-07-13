@@ -1,3 +1,4 @@
+// lib/features/suppliers/presentation/widgets/receive_item_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
@@ -6,7 +7,6 @@ import 'package:syria_store/features/suppliers/presentation/providers/agreement_
 class ReceiveItemDialog extends ConsumerStatefulWidget {
   final AgreementItem item;
   final String agreementId;
-
   const ReceiveItemDialog({
     super.key,
     required this.item,
@@ -38,7 +38,7 @@ class _ReceiveItemDialogState extends ConsumerState<ReceiveItemDialog> {
           .read(updateAgreementStatusControllerProvider.notifier)
           .receiveItems(
             context: context,
-            itemId: widget.item.id,
+            itemId: widget.item.id.toString(), // ✅ تم التعديل هنا
             agreementId: widget.agreementId,
             quantity: quantity,
             notes: _notesController.text.trim(),
@@ -56,9 +56,8 @@ class _ReceiveItemDialogState extends ConsumerState<ReceiveItemDialog> {
     final isSaving = ref.watch(updateAgreementStatusControllerProvider);
     final remainingQuantity =
         widget.item.totalQuantity - widget.item.receivedQuantitySoFar;
-
     return AlertDialog(
-      title: Text('استلام: ${widget.item.itemName}'),
+      title: Text('استلام: ${widget.item.product?.name ?? "منتج غير معرف"}'),
       content: Form(
         key: _formKey,
         child: Column(

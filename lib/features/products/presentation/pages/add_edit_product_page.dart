@@ -2,11 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:syria_store/features/categories/data/models/category_model.dart';
 import 'package:syria_store/features/products/presentation/providers/product_providers.dart';
+import 'package:syria_store/features/products/presentation/widgets/add_edit_form/product_association_form.dart';
+import 'package:syria_store/features/products/presentation/widgets/add_edit_form/product_primary_info_form.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
 
 class AddEditProductPage extends ConsumerStatefulWidget {
-  const AddEditProductPage({super.key});
+  final String? productId;
+  const AddEditProductPage({super.key, this.productId});
 
   @override
   ConsumerState<AddEditProductPage> createState() => _AddEditProductPageState();
@@ -17,7 +21,9 @@ class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _unitController = TextEditingController(text: 'قطعة');
+  
   Supplier? _selectedSupplier;
+  CategoryModel? _selectedCategory;
 
   @override
   void dispose() {
@@ -29,33 +35,41 @@ class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
 
   void _saveProduct() {
     if (_formKey.currentState!.validate()) {
-      ref
-          .read(productControllerProvider.notifier)
-          .addProduct(
-            context: context,
-            name: _nameController.text.trim(),
-            supplierId: _selectedSupplier!.id,
-            description: _descriptionController.text.trim(),
-            unitOfMeasure: _unitController.text.trim(),
-          )
-          .then((success) {
-            if (success && mounted) {
-              context.pop();
-            }
-          });
+      if(widget.productId == null){
+        // Add new product logic
+        ref.read(productControllerProvider.notifier).addProduct(
+          context: context,
+          name: _nameController.text.trim(),
+          contactId: _selectedSupplier!.id,
+          description: _descriptionController.text.trim(),
+          unitOfMeasure: _unitController.text.trim(),
+        ).then((success) {
+          if (success && mounted) context.pop();
+        });
+      } else {
+        // Edit existing product logic
+        ref.read(productControllerProvider.notifier).updateProduct(
+          context: context,
+          productId: widget.productId!,
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          unitOfMeasure: _unitController.text.trim(),
+        ).then((success) {
+          if (success && mounted) context.pop();
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- بداية التعديل ---
-    // تم تغيير Provider الموردين إلى Provider الجديد الذي لا يعتمد على تصنيف
-    final suppliersAsync = ref.watch(simpleAllSuppliersProvider);
-    // --- نهاية التعديل ---
     final isLoading = ref.watch(productControllerProvider);
+    final isEditing = widget.productId != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('إضافة منتج جديد للكتالوج')),
+      appBar: AppBar(
+        title: Text(isEditing ? 'تعديل منتج' : 'إضافة منتج جديد للكتالوج'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -63,57 +77,30 @@ class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'اسم المنتج'),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'الحقل مطلوب' : null,
+              ProductPrimaryInfoForm(
+                nameController: _nameController,
+                descriptionController: _descriptionController,
+                unitController: _unitController,
               ),
               const SizedBox(height: 16),
-              // يتطلب اختيار مورد افتراضي لإنشاء الرمز SKU
-              DropdownButtonFormField<Supplier>(
-                value: _selectedSupplier,
-                hint: const Text('اختر المورد الافتراضي'),
-                decoration: const InputDecoration(
-                  labelText: 'المورد الافتراضي (لإنشاء الرمز)',
+              // We hide this section in edit mode for now, as changing category/supplier of an existing product has complex implications
+              if (!isEditing)
+                ProductAssociationForm(
+                  selectedCategory: _selectedCategory,
+                  selectedSupplier: _selectedSupplier,
+                  onCategoryChanged: (category) => setState(() {
+                    _selectedCategory = category;
+                    _selectedSupplier = null; // Reset supplier when category changes
+                  }),
+                  onSupplierChanged: (supplier) => setState(() => _selectedSupplier = supplier),
                 ),
-                // سيتم عرض رسالة "جاري التحميل" أو "خطأ" تلقائيًا من .when
-                items: suppliersAsync.when(
-                  data: (suppliers) => suppliers
-                      .map(
-                        (s) => DropdownMenuItem(value: s, child: Text(s.name)),
-                      )
-                      .toList(),
-                  loading: () => [],
-                  error: (err, stack) => [],
-                ),
-                onChanged: (supplier) =>
-                    setState(() => _selectedSupplier = supplier),
-                validator: (value) =>
-                    value == null ? 'يجب اختيار مورد افتراضي' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'الوصف (اختياري)'),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _unitController,
-                decoration: const InputDecoration(labelText: 'وحدة القياس'),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'الحقل مطلوب' : null,
-              ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: isLoading ? null : _saveProduct,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                ),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
                 child: isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('حفظ المنتج'),
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                    : Text(isEditing ? 'حفظ التعديلات' : 'حفظ المنتج'),
               ),
             ],
           ),

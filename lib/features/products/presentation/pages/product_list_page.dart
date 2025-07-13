@@ -1,18 +1,36 @@
 // lib/features/products/presentation/pages/product_list_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:syria_store/app/widgets/app_drawer.dart';
 import 'package:syria_store/features/products/presentation/providers/product_providers.dart';
 
-class ProductListPage extends ConsumerWidget {
+class ProductListPage extends ConsumerStatefulWidget {
   const ProductListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final productsAsync = ref.watch(allProductsProvider);
-    final searchQuery = ref.watch(productSearchQueryProvider);
+  ConsumerState<ProductListPage> createState() => _ProductListPageState();
+}
 
+class _ProductListPageState extends ConsumerState<ProductListPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(productSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(allProductsProvider);
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('إدارة المنتجات (الكتالوج)')),
@@ -26,7 +44,7 @@ class ProductListPage extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              controller: TextEditingController(text: searchQuery),
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'ابحث بالاسم أو الرمز (SKU)...',
                 prefixIcon: const Icon(Icons.search),
@@ -50,11 +68,30 @@ class ProductListPage extends ConsumerWidget {
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      return ListTile(
-                        leading: CircleAvatar(child: Text(product.sku)),
-                        title: Text(product.name),
-                        subtitle: Text('وحدة القياس: ${product.unitOfMeasure}'),
-                        // onTap: () => context.push('/products/edit/${product.id}'), // للتعديل مستقبلاً
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: FittedBox(
+                              child: Text(
+                                product.sku,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            product.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          // -- تعديل -- : استخدام contactName
+                          subtitle: Text(
+                            'المورد الافتراضي: ${product.contactName ?? 'غير محدد'}',
+                          ),
+                          trailing: Text(product.unitOfMeasure),
+                        ),
                       );
                     },
                   );

@@ -1,4 +1,3 @@
-// lib/features/suppliers/presentation/widgets/private_storage_image.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
@@ -14,7 +13,7 @@ class PrivateStorageImage extends ConsumerWidget {
           .read(supabaseProvider)
           .storage
           .from('agreement-documents')
-          .createSignedUrl(imagePath, 60), // 60 ثانية صلاحية للرابط
+          .createSignedUrl(imagePath, 3600), // زيادة مدة صلاحية الرابط
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -25,20 +24,35 @@ class PrivateStorageImage extends ConsumerWidget {
             child: Icon(Icons.error_outline, color: Colors.red),
           );
         }
-
         final signedUrl = snapshot.data!;
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            signedUrl,
-            width: 150,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) => progress == null
-                ? child
-                : const Center(child: CircularProgressIndicator()),
-            errorBuilder: (context, error, stack) => const Tooltip(
-              message: 'فشل تحميل الصورة من الرابط',
-              child: Icon(Icons.broken_image_outlined, color: Colors.red),
+        return InkWell(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => Dialog(
+                child: InteractiveViewer(
+                  panEnabled: false,
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: Image.network(signedUrl),
+                ),
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              signedUrl,
+              width: 150,
+              height: 150,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const Center(child: CircularProgressIndicator()),
+              errorBuilder: (context, error, stack) => const Tooltip(
+                message: 'فشل تحميل الصورة من الرابط',
+                child: Icon(Icons.broken_image_outlined, color: Colors.red),
+              ),
             ),
           ),
         );

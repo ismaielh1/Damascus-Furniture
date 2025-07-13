@@ -5,12 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-// --- بداية التعديل ---
-// تم إضافة hide TextDirection لحل مشكلة التعارض
-import 'package:intl/intl.dart' hide TextDirection;
-// --- نهاية التعديل ---
+import 'package:syria_store/features/categories/data/models/category_model.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/add_agreement_item_dialog.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/add_supplier_dialog.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
-import 'package:syria_store/features/suppliers/presentation/widgets/add_item_dialog.dart';
 
 final pickedImagesProvider = StateProvider.autoDispose<List<XFile>>(
   (ref) => [],
@@ -27,7 +26,6 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
   Supplier? _selectedSupplier;
   final _notesController = TextEditingController();
   final _downPaymentController = TextEditingController();
-
   @override
   void dispose() {
     _notesController.dispose();
@@ -60,124 +58,55 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
       );
       return;
     }
-
     showDialog(
       context: context,
-      builder: (dialogContext) {
-        final dialogFormKey = GlobalKey<FormState>();
-        final nameController = TextEditingController();
-        final phoneController = TextEditingController();
-        final addressController = TextEditingController();
-
-        return AlertDialog(
-          title: const Text('إضافة مورد جديد'),
-          content: Form(
-            key: dialogFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'اسم المورد'),
-                  validator: (val) =>
-                      val == null || val.isEmpty ? 'الحقل مطلوب' : null,
-                ),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: TextFormField(
-                    controller: phoneController,
-                    decoration: const InputDecoration(labelText: 'رقم الهاتف'),
-                    keyboardType: TextInputType.phone,
-                    textAlign: TextAlign.left,
-                  ),
-                ),
-                TextFormField(
-                  controller: addressController,
-                  decoration: const InputDecoration(labelText: 'العنوان'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('إلغاء'),
-            ),
-            Consumer(
-              builder: (context, ref, child) {
-                final isLoading = ref.watch(addSupplierControllerProvider);
-                return ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          if (dialogFormKey.currentState!.validate()) {
-                            final newSupplier = await ref
-                                .read(addSupplierControllerProvider.notifier)
-                                .addSupplier(
-                                  context: context,
-                                  name: nameController.text.trim(),
-                                  phone: phoneController.text.trim(),
-                                  address: addressController.text.trim(),
-                                  categoryId: selectedCategory.id,
-                                );
-
-                            if (newSupplier != null && mounted) {
-                              setState(() => _selectedSupplier = newSupplier);
-                              Navigator.of(dialogContext).pop();
-                            }
-                          }
-                        },
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('حفظ'),
-                );
-              },
-            ),
-          ],
-        );
-      },
+      builder: (_) =>
+          AddSupplierDialog(selectedCategoryId: selectedCategory.id),
     );
   }
 
-  void _submitAgreement() {
-    final agreementItems = ref.read(agreementFormProvider);
-    final imagesToUpload = ref.read(pickedImagesProvider);
-
-    if (_formKey.currentState!.validate() &&
-        _selectedSupplier != null &&
-        agreementItems.isNotEmpty) {
-      ref
-          .read(agreementControllerProvider.notifier)
-          .createFullAgreement(
-            context: context,
-            supplierId: _selectedSupplier!.id,
-            notes: _notesController.text.trim(),
-            items: agreementItems,
-            downPayment:
-                double.tryParse(_downPaymentController.text.trim()) ?? 0.0,
-            images: imagesToUpload,
-          )
-          .then((success) {
-            if (success && mounted) {
-              context.go('/supplier-agreements');
-            }
-          });
-    } else if (agreementItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يجب إضافة بند واحد على الأقل'),
-          backgroundColor: Colors.orange,
-        ),
+  Future<void> _selectAndAddItem() async {
+    final selectedProduct = await context.push<ProductModel>(
+      '/products/select',
+    );
+    if (selectedProduct != null && mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => AddAgreementItemDialog(product: selectedProduct),
       );
     }
   }
 
-  void _addNewItem() {
-    showDialog(context: context, builder: (_) => const AddItemDialog());
+  void _submitAgreement() {
+    if (_formKey.currentState!.validate() &&
+        _selectedSupplier != null &&
+        ref.read(agreementFormProvider).isNotEmpty) {
+      ref
+          .read(agreementControllerProvider.notifier)
+          .createFullAgreement(
+            context: context,
+            contactId: _selectedSupplier!.id, // تم التغيير من supplierId
+            notes: _notesController.text.trim(),
+            items: ref.read(agreementFormProvider),
+            downPayment:
+                double.tryParse(_downPaymentController.text.trim()) ?? 0,
+            images: ref.read(pickedImagesProvider),
+          )
+          .then((success) {
+            if (success && mounted) {
+              context.pop();
+            }
+          });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'الرجاء التأكد من اختيار مورد وإضافة بند واحد على الأقل.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -187,11 +116,6 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
     final grandTotal = ref.watch(agreementFormProvider.notifier).grandTotal;
     final isSaving = ref.watch(agreementControllerProvider);
     final theme = Theme.of(context);
-
-    // محدد تنسيق الأرقام بالصيغة الإنجليزية
-    final numberFormatter = NumberFormat("#,##0.00", "en_US");
-    final integerFormatter = NumberFormat("0", "en_US");
-
     return Scaffold(
       appBar: AppBar(title: const Text('إنشاء اتفاقية توريد')),
       body: SingleChildScrollView(
@@ -207,12 +131,13 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
               ),
               const Divider(),
               const SizedBox(height: 8),
+
               Consumer(
                 builder: (context, ref, child) {
                   final categoriesAsync = ref.watch(supplierCategoriesProvider);
                   return categoriesAsync.when(
                     data: (categories) =>
-                        DropdownButtonFormField<SupplierCategory>(
+                        DropdownButtonFormField<CategoryModel>(
                           hint: const Text('اختر تصنيف المورد'),
                           decoration: const InputDecoration(
                             labelText: 'التصنيف',
@@ -239,6 +164,7 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                   );
                 },
               ),
+
               const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -260,6 +186,7 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                             final currentValue = isSelectedSupplierInList
                                 ? _selectedSupplier
                                 : null;
+
                             return DropdownButtonFormField<Supplier>(
                               value: currentValue,
                               hint: const Text('اختر المورد'),
@@ -309,121 +236,29 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
               TextFormField(
                 controller: _notesController,
                 decoration: const InputDecoration(
-                  labelText: 'ملاحظات عامة',
-                  hintText: 'أي تفاصيل إضافية عن الاتفاقية...',
+                  labelText: 'ملاحظات الاتفاقية',
                 ),
-                maxLines: 2,
+                maxLines: 4,
               ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('بنود الاتفاقية', style: theme.textTheme.titleLarge),
-                  FilledButton.icon(
-                    onPressed: _addNewItem,
-                    icon: const Icon(Icons.add),
-                    label: const Text('إضافة بند'),
-                  ),
-                ],
-              ),
-              const Divider(),
-              if (items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32.0),
-                  child: Center(child: Text('لم يتم إضافة أي بنود بعد.')),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          child: Text(
-                            integerFormatter.format(index + 1),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          backgroundColor: theme.primaryColor,
-                        ),
-                        title: Text(
-                          item.itemName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Text(
-                            'Qty: ${integerFormatter.format(item.totalQuantity)} - Price: \$${numberFormatter.format(item.unitPrice)}',
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: Text(
-                                '\$${numberFormatter.format(item.subtotal)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blueGrey,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: theme.colorScheme.error,
-                              ),
-                              onPressed: () => ref
-                                  .read(agreementFormProvider.notifier)
-                                  .removeItem(item.id),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('المستندات المرفقة', style: theme.textTheme.titleLarge),
-                  FilledButton.icon(
-                    onPressed: _pickImages,
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    label: const Text('إضافة صور'),
-                  ),
-                ],
-              ),
-              const Divider(),
-              if (pickedImages.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Center(child: Text('لم يتم اختيار أي صور بعد.')),
-                )
-              else
-                Container(
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+
+              const Divider(height: 32),
+              Text('المستندات والصور', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+
+              if (pickedImages.isNotEmpty)
+                SizedBox(
+                  height: 100,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: pickedImages.length,
                     itemBuilder: (context, index) {
                       final imageFile = pickedImages[index];
                       return Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.only(right: 8.0),
                         child: Stack(
-                          clipBehavior: Clip.none,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                               child: kIsWeb
                                   ? Image.network(
                                       imageFile.path,
@@ -439,27 +274,28 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                                     ),
                             ),
                             Positioned(
-                              top: -10,
-                              right: -10,
-                              child: IconButton(
-                                icon: const CircleAvatar(
-                                  backgroundColor: Colors.red,
-                                  radius: 12,
-                                  child: Icon(
+                              top: 0,
+                              right: 0,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.black.withOpacity(0.6),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(
                                     Icons.close,
                                     color: Colors.white,
                                     size: 14,
                                   ),
+                                  onPressed: () {
+                                    ref
+                                        .read(pickedImagesProvider.notifier)
+                                        .update((state) {
+                                          final newList = List.of(state);
+                                          newList.removeAt(index);
+                                          return newList;
+                                        });
+                                  },
                                 ),
-                                onPressed: () {
-                                  ref
-                                      .read(pickedImagesProvider.notifier)
-                                      .update((state) {
-                                        final newList = List<XFile>.from(state);
-                                        newList.removeAt(index);
-                                        return newList;
-                                      });
-                                },
                               ),
                             ),
                           ],
@@ -468,58 +304,117 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                     },
                   ),
                 ),
-              const Divider(),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _pickImages,
+                icon: const Icon(Icons.attach_file),
+                label: const Text('إرفاق مستندات أو صور'),
+              ),
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('بنود الاتفاقية', style: theme.textTheme.titleLarge),
+                  FilledButton.icon(
+                    onPressed: _selectAndAddItem,
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('إضافة بند'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (items.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('لم يتم إضافة أي بنود بعد.'),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text(item.product?.name ?? 'منتج غير معرف'),
+                        subtitle: Text(
+                          'الكمية: ${item.totalQuantity} × السعر: \$${item.unitPrice.toStringAsFixed(2)}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '\$${item.subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Colors.red.shade700,
+                              ),
+                              onPressed: () => ref
+                                  .read(agreementFormProvider.notifier)
+                                  .removeItem(item.id.toString()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: 24),
+              const Divider(height: 32),
+
+              Text('الملخص المالي', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+
               TextFormField(
                 controller: _downPaymentController,
                 decoration: const InputDecoration(
-                  labelText: 'العربون (دفعة أولى)',
-                  prefixIcon: Icon(Icons.payments_outlined),
-                  suffixText: '\$',
+                  labelText: 'الدفعة المقدمة (اختياري)',
+                  prefixText: '\$ ',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
               ),
               const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'المجموع النهائي',
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Text(
-                        '\$${numberFormatter.format(grandTotal)}',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: theme.primaryColor,
-                        ),
-                      ),
-                    ),
-                  ],
+              ListTile(
+                title: Text(
+                  'المجموع الإجمالي للبنود',
+                  style: theme.textTheme.titleMedium,
+                ),
+                trailing: Text(
+                  '\$${grandTotal.toStringAsFixed(2)}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: isSaving ? null : _submitAgreement,
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
                     padding: const EdgeInsets.all(16),
                   ),
                   child: isSaving
                       ? const SizedBox(
-                          width: 24,
                           height: 24,
+                          width: 24,
                           child: CircularProgressIndicator(
                             color: Colors.white,
-                            strokeWidth: 3,
+                            strokeWidth: 2.5,
                           ),
                         )
-                      : const Text('حفظ الاتفاقية النهائية'),
+                      : const Text('حفظ الاتفاقية'),
                 ),
               ),
             ],
