@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+// --- بداية التعديل ---
+// تم إضافة hide TextDirection لحل مشكلة التعارض
+import 'package:intl/intl.dart' hide TextDirection;
+// --- نهاية التعديل ---
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
 import 'package:syria_store/features/suppliers/presentation/widgets/add_item_dialog.dart';
 
@@ -184,6 +188,10 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
     final isSaving = ref.watch(agreementControllerProvider);
     final theme = Theme.of(context);
 
+    // محدد تنسيق الأرقام بالصيغة الإنجليزية
+    final numberFormatter = NumberFormat("#,##0.00", "en_US");
+    final integerFormatter = NumberFormat("0", "en_US");
+
     return Scaffold(
       appBar: AppBar(title: const Text('إنشاء اتفاقية توريد')),
       body: SingleChildScrollView(
@@ -252,7 +260,6 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                             final currentValue = isSelectedSupplierInList
                                 ? _selectedSupplier
                                 : null;
-
                             return DropdownButtonFormField<Supplier>(
                               value: currentValue,
                               hint: const Text('اختر المورد'),
@@ -335,22 +342,34 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: ListTile(
-                        leading: CircleAvatar(child: Text('${index + 1}')),
+                        leading: CircleAvatar(
+                          child: Text(
+                            integerFormatter.format(index + 1),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: theme.primaryColor,
+                        ),
                         title: Text(
                           item.itemName,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        subtitle: Text(
-                          'الكمية: ${item.totalQuantity} - السعر: \$${item.unitPrice.toStringAsFixed(2)}',
+                        subtitle: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            'Qty: ${integerFormatter.format(item.totalQuantity)} - Price: \$${numberFormatter.format(item.unitPrice)}',
+                          ),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              '\$${item.subtotal.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueGrey,
+                            Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                '\$${numberFormatter.format(item.subtotal)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blueGrey,
+                                ),
                               ),
                             ),
                             IconButton(
@@ -471,10 +490,13 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
                       'المجموع النهائي',
                       style: theme.textTheme.headlineSmall,
                     ),
-                    Text(
-                      '\$${grandTotal.toStringAsFixed(2)}',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: theme.primaryColor,
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        '\$${numberFormatter.format(grandTotal)}',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.primaryColor,
+                        ),
                       ),
                     ),
                   ],

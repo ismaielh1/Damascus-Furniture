@@ -1,10 +1,13 @@
-// lib/core/routing/app_router.dart
+// lib/app/routes/app_router.dart
 import 'package:go_router/go_router.dart';
 import 'package:syria_store/features/logs/presentation/pages/logs_page.dart';
 import 'package:syria_store/features/products/presentation/pages/add_edit_product_page.dart';
 import 'package:syria_store/features/products/presentation/pages/product_list_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/add_agreement_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/agreement_details_page.dart';
+// --- بداية الإضافة ---
+import 'package:syria_store/features/suppliers/presentation/pages/manage_supplier_categories_page.dart';
+// --- نهاية الإضافة ---
 import 'package:syria_store/features/suppliers/presentation/pages/supplier_agreements_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/supplier_details_page.dart';
 import 'package:syria_store/features/suppliers/presentation/pages/suppliers_list_page.dart';
@@ -50,17 +53,18 @@ final goRouter = GoRouter(
           path: 'new',
           builder: (context, state) => const AddEditProductPage(),
         ),
-        // مستقبلاً يمكن إضافة مسار التعديل
-        // GoRoute(
-        //   path: 'edit/:productId',
-        //   builder: (context, state) => AddEditProductPage(productId: state.pathParameters['productId']),
-        // ),
       ],
     ),
     GoRoute(
       path: '/add-agreement',
       builder: (context, state) => const AddAgreementPage(),
     ),
+    // --- بداية الإضافة ---
+    GoRoute(
+      path: '/manage-supplier-categories',
+      builder: (context, state) => const ManageSupplierCategoriesPage(),
+    ),
+    // --- نهاية الإضافة ---
     GoRoute(path: '/logs', builder: (context, state) => const LogsPage()),
   ],
 );

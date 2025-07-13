@@ -14,12 +14,15 @@ final allSuppliersProvider = FutureProvider.autoDispose<List<SupplierModel>>((
   final searchQuery = ref.watch(supplierSearchQueryProvider);
 
   try {
-    // تعديل الـ select ليقرأ التصنيف من خلال الجدول الوسيط
+    // --- بداية التعديل ---
+    // التغيير من جدول "suppliers" إلى "contacts"
+    // إضافة فلتر لجلب الموردين فقط
     var query = supabase
-        .from('suppliers')
-        .select(
-          '*, supplier_category_link!inner(*, supplier_categories(name))',
-        );
+        .from('contacts')
+        .select('*, supplier_category_link!inner(*, supplier_categories(name))')
+        .eq('is_supplier', true); // <-- فلتر مهم لجلب الموردين فقط
+
+    // --- نهاية التعديل ---
 
     if (searchQuery.isNotEmpty) {
       // البحث في اسم المورد أو رقم الهاتف أو العنوان

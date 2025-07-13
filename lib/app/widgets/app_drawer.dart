@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -43,6 +44,24 @@ class AppDrawer extends StatelessWidget {
               context.go('/products');
             },
           ),
+          const Divider(),
+          // --- بداية الإضافة ---
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
+              'الإعدادات والإدارة',
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('إدارة تصنيفات الموردين'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/manage-supplier-categories');
+            },
+          ),
+          // --- نهاية الإضافة ---
           const Divider(),
           ListTile(
             leading: const Icon(Icons.history_edu_outlined),

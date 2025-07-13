@@ -48,9 +48,10 @@ class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
 
   @override
   Widget build(BuildContext context) {
-    final suppliersAsync = ref.watch(
-      suppliersByCategoryProvider,
-    ); // Note: This might need adjustment if categories aren't used
+    // --- بداية التعديل ---
+    // تم تغيير Provider الموردين إلى Provider الجديد الذي لا يعتمد على تصنيف
+    final suppliersAsync = ref.watch(simpleAllSuppliersProvider);
+    // --- نهاية التعديل ---
     final isLoading = ref.watch(productControllerProvider);
 
     return Scaffold(
@@ -76,14 +77,16 @@ class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
                 decoration: const InputDecoration(
                   labelText: 'المورد الافتراضي (لإنشاء الرمز)',
                 ),
-                items:
-                    suppliersAsync.asData?.value
-                        .map(
-                          (s) =>
-                              DropdownMenuItem(value: s, child: Text(s.name)),
-                        )
-                        .toList() ??
-                    [],
+                // سيتم عرض رسالة "جاري التحميل" أو "خطأ" تلقائيًا من .when
+                items: suppliersAsync.when(
+                  data: (suppliers) => suppliers
+                      .map(
+                        (s) => DropdownMenuItem(value: s, child: Text(s.name)),
+                      )
+                      .toList(),
+                  loading: () => [],
+                  error: (err, stack) => [],
+                ),
                 onChanged: (supplier) =>
                     setState(() => _selectedSupplier = supplier),
                 validator: (value) =>

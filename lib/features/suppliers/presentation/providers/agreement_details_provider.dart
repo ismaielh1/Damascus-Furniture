@@ -1,3 +1,4 @@
+// lib/features/suppliers/presentation/providers/agreement_details_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syria_store/features/suppliers/data/models/supplier_agreement_model.dart';
@@ -8,11 +9,13 @@ final agreementDetailsProvider = FutureProvider.autoDispose
     .family<SupplierAgreement?, String>((ref, agreementId) async {
       final supabase = ref.watch(supabaseProvider);
       try {
+        // --- بداية التعديل ---
         final response = await supabase
             .from('supplier_agreements')
-            .select('*, suppliers(id, name)')
+            .select('*, contacts(id, name)') // استخدام contacts
             .eq('id', agreementId)
             .single();
+        // --- نهاية التعديل ---
         return SupplierAgreement.fromJson(response);
       } catch (e) {
         debugPrint("Error fetching agreement details: $e");
@@ -67,7 +70,6 @@ class UpdateAgreementStatusController extends StateNotifier<bool> {
               'notes_input': notes,
             },
           );
-
       await _refreshAllProviders(agreementId);
 
       if (context.mounted) {

@@ -1,3 +1,4 @@
+// lib/features/suppliers/presentation/providers/agreement_form_provider.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:equatable/equatable.dart';
@@ -12,6 +13,7 @@ import 'package:syria_store/features/suppliers/presentation/providers/agreement_
 class SupplierCategory extends Equatable {
   final int id;
   final String name;
+
   const SupplierCategory({required this.id, required this.name});
   @override
   List<Object?> get props => [id];
@@ -21,6 +23,7 @@ class Supplier extends Equatable {
   final String id;
   final String name;
   const Supplier({required this.id, required this.name});
+
   @override
   List<Object?> get props => [id];
 }
@@ -47,10 +50,29 @@ final suppliersByCategoryProvider = FutureProvider.autoDispose<List<Supplier>>((
   final supabase = ref.watch(supabaseProvider);
   final selectedCategory = ref.watch(selectedCategoryProvider);
   if (selectedCategory == null) return [];
+
+  // تم تغيير from('suppliers') إلى from('contacts') مع إضافة فلتر لجلب الموردين فقط
   final response = await supabase
-      .from('suppliers')
+      .from('contacts')
       .select('id, name, supplier_category_link!inner(category_id)')
+      .eq('is_supplier', true) // <-- فلترة الموردين
       .eq('supplier_category_link.category_id', selectedCategory.id)
+      .order('name');
+
+  return response
+      .map((item) => Supplier(id: item['id'], name: item['name']))
+      .toList();
+});
+
+// Provider جديد لجلب كل الموردين دون فلترة حسب التصنيف
+final simpleAllSuppliersProvider = FutureProvider.autoDispose<List<Supplier>>((
+  ref,
+) async {
+  final supabase = ref.watch(supabaseProvider);
+  final response = await supabase
+      .from('contacts')
+      .select('id, name')
+      .eq('is_supplier', true)
       .order('name');
   return response
       .map((item) => Supplier(id: item['id'], name: item['name']))
@@ -76,7 +98,6 @@ class AgreementFormNotifier extends StateNotifier<List<AgreementItem>> {
   }
 
   double get grandTotal => state.fold(0.0, (sum, item) => sum + item.subtotal);
-
   void clear() {
     state = [];
   }
@@ -90,6 +111,7 @@ final addSupplierControllerProvider =
 class AddSupplierController extends StateNotifier<bool> {
   final Ref _ref;
   AddSupplierController({required Ref ref}) : _ref = ref, super(false);
+
   Future<Supplier?> addSupplier({
     required BuildContext context,
     required String name,
@@ -101,17 +123,30 @@ class AddSupplierController extends StateNotifier<bool> {
     state = true;
     try {
       final supabase = _ref.read(supabaseProvider);
-      final newSupplierData = await supabase
-          .from('suppliers')
-          .insert({'name': name, 'phone_number': phone, 'address': address})
+
+      // الإضافة إلى جدول "contacts" بدلاً من "suppliers"
+      // مع تحديد أن هذا الشخص هو مورد
+      final newContactData = await supabase
+          .from('contacts')
+          .insert({
+            'name': name,
+            'phone_number': phone,
+            'address': address,
+            'is_supplier': true, // <-- مهم جدًا
+          })
           .select()
           .single();
-      final newSupplierId = newSupplierData['id'];
+
+      final newContactId = newContactData['id'];
+
+      // استخدام "contact_id" الصحيح عند الربط مع التصنيف
       await supabase.from('supplier_category_link').insert({
-        'supplier_id': newSupplierId,
+        'contact_id': newContactId,
         'category_id': categoryId,
       });
+
       _ref.invalidate(suppliersByCategoryProvider);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -120,7 +155,7 @@ class AddSupplierController extends StateNotifier<bool> {
           ),
         );
       }
-      return Supplier(id: newSupplierId, name: name);
+      return Supplier(id: newContactId, name: name);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -158,8 +193,7 @@ class AgreementController extends StateNotifier<bool> {
     state = true;
     try {
       final supabase = _ref.read(supabaseProvider);
-      List<String> imagePaths = []; // سنحفظ المسارات هنا
-
+      List<String> imagePaths = [];
       if (images.isNotEmpty) {
         final String agreementFolder =
             'public/agreements/${DateTime.now().millisecondsSinceEpoch}';
@@ -182,13 +216,10 @@ class AgreementController extends StateNotifier<bool> {
                 .from(bucketName)
                 .upload(uploadPath, File(image.path));
           }
-
           imagePaths.add(uploadPath);
         }
       }
-
       final itemsList = items.map((item) => item.toJson()).toList();
-
       await _ref
           .read(supabaseProvider)
           .rpc(
@@ -201,7 +232,6 @@ class AgreementController extends StateNotifier<bool> {
               'document_urls_input': imagePaths,
             },
           );
-
       _ref.invalidate(agreementsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
