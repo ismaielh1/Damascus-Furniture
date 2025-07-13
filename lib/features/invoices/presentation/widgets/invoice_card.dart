@@ -1,13 +1,13 @@
+// lib/features/invoices/presentation/widgets/invoice_card.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
-// افترض وجود هذا الـ provider بناءً على السياق
-import 'package:syria_store/features/reports/presentation/providers/report_provider.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
 
 class InvoiceCard extends ConsumerWidget {
-  final Invoice invoice;
+  // -- التصحيح الأول: استخدام اسم الكلاس الصحيح --
+  final InvoiceModel invoice;
 
   const InvoiceCard({super.key, required this.invoice});
 
@@ -15,8 +15,9 @@ class InvoiceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     // نفترض أن هذا الـ provider يجلب ملخصًا ماليًا للعميل المرتبط بالفاتورة
-    final financialSummaryAsync = invoice.contactId != null
-        ? ref.watch(supplierFinancialSummaryProvider(invoice.contactId!))
+    final financialSummaryAsync = invoice.customerName != null
+        ? ref.watch(supplierFinancialSummaryProvider(
+            invoice.id)) // Assuming customerId is on invoice
         : null;
 
     return Card(
@@ -42,30 +43,22 @@ class InvoiceCard extends ConsumerWidget {
               ],
             ),
             const Divider(),
-            Text('العميل: ${invoice.contactName ?? "زبون عابر"}'),
+            Text('العميل: ${invoice.customerName ?? "زبون عابر"}'),
             Text(
               'المبلغ الإجمالي: ${NumberFormat.simpleCurrency(locale: 'en_US').format(invoice.totalAmount)}',
             ),
             const SizedBox(height: 8),
 
-            // ==== بداية التعديل هنا ====
+            // -- التصحيح الثاني: استخدام . للوصول للبيانات --
             if (financialSummaryAsync != null)
               financialSummaryAsync.when(
                 data: (summary) {
-                  // استخدام tryParse للأمان
-                  final totalDue =
-                      double.tryParse(
-                        summary['total_due']?.toString() ?? '0.0',
-                      ) ??
-                      0.0;
-                  final remainingBalance =
-                      double.tryParse(
-                        summary['remaining_balance']?.toString() ?? '0.0',
-                      ) ??
-                      0.0;
+                  // استخدام dot notation والأسماء الصحيحة من الموديل
+                  final balance = summary.balance;
 
-                  if (totalDue == 0 && remainingBalance == 0) {
-                    return const SizedBox.shrink(); // لا تعرض شيئًا إذا كانت القيم صفرية
+                  // لا نعرض شيئًا إذا كان الرصيد صفرًا
+                  if (balance == 0) {
+                    return const SizedBox.shrink();
                   }
 
                   return Container(
@@ -76,15 +69,13 @@ class InvoiceCard extends ConsumerWidget {
                     ),
                     child: Column(
                       children: [
-                        if (totalDue > 0)
-                          Text(
-                            'إجمالي الديون على العميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(totalDue)}',
-                            style: TextStyle(color: Colors.red.shade700),
-                          ),
-                        if (remainingBalance != 0)
-                          Text(
-                            'الرصيد المتبقي للعميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(remainingBalance)}',
-                          ),
+                        Text(
+                          'الرصيد المتبقي للعميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(balance)}',
+                          style: TextStyle(
+                              color: balance > 0
+                                  ? Colors.red.shade700
+                                  : Colors.green.shade700),
+                        ),
                       ],
                     ),
                   );
@@ -99,7 +90,6 @@ class InvoiceCard extends ConsumerWidget {
                   style: TextStyle(color: Colors.red.shade700),
                 ),
               ),
-            // ==== نهاية التعديل ====
           ],
         ),
       ),

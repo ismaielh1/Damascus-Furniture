@@ -1,4 +1,4 @@
-import 'dart:convert';
+// lib/features/suppliers/presentation/providers/agreement_form_provider.dart
 import 'dart:io';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -32,9 +32,8 @@ final selectedCategoryProvider = StateProvider.autoDispose<CategoryModel?>(
   (ref) => null,
 );
 
-final suppliersByCategoryProvider = FutureProvider.autoDispose<List<Supplier>>((
-  ref,
-) async {
+final suppliersByCategoryProvider =
+    FutureProvider.autoDispose<List<Supplier>>((ref) async {
   final supabase = ref.watch(supabaseProvider);
   final selectedCategory = ref.watch(selectedCategoryProvider);
   if (selectedCategory == null) return [];
@@ -50,9 +49,9 @@ final suppliersByCategoryProvider = FutureProvider.autoDispose<List<Supplier>>((
       .map((item) => Supplier(id: item['id'].toString(), name: item['name']))
       .toList();
 });
-final agreementFormProvider =
-    StateNotifierProvider.autoDispose<AgreementFormNotifier, List<AgreementItem>>(
-        (ref) {
+
+final agreementFormProvider = StateNotifierProvider.autoDispose<
+    AgreementFormNotifier, List<AgreementItem>>((ref) {
   return AgreementFormNotifier();
 });
 
@@ -62,8 +61,8 @@ class AgreementFormNotifier extends StateNotifier<List<AgreementItem>> {
     state = [...state, item];
   }
 
-  void removeItem(String itemId) {
-    state = state.where((item) => item.id != itemId).toList();
+  void removeItem(String productId) {
+    state = state.where((item) => item.product?.id != productId).toList();
   }
 
   double get grandTotal => state.fold(0.0, (sum, item) => sum + item.subtotal);
@@ -76,10 +75,12 @@ final addSupplierControllerProvider =
     StateNotifierProvider.autoDispose<AddSupplierController, bool>((ref) {
   return AddSupplierController(ref: ref);
 });
+
 class AddSupplierController extends StateNotifier<bool> {
   final Ref _ref;
-  AddSupplierController({required Ref ref}) : _ref = ref, super(false);
-
+  AddSupplierController({required Ref ref})
+      : _ref = ref,
+        super(false);
   Future<Supplier?> addSupplier({
     required BuildContext context,
     required String name,
@@ -90,26 +91,21 @@ class AddSupplierController extends StateNotifier<bool> {
     if (state) return null;
     state = true;
     try {
-      final response = await _ref
-          .read(supabaseProvider)
-          .rpc(
-            'add_contact',
-            params: {
-              'p_name': name,
-              'p_phone_number': phone,
-              'p_address': address,
-              'p_is_supplier': true,
-              'p_is_customer': false,
-              'p_category_id': categoryId,
-            },
-          )
-          .single();
-
+      final response = await _ref.read(supabaseProvider).rpc(
+        'add_contact',
+        params: {
+          'p_name': name,
+          'p_phone_number': phone,
+          'p_address': address,
+          'p_is_supplier': true,
+          'p_is_customer': false,
+          'p_category_id': categoryId,
+        },
+      ).single();
       final newSupplier = Supplier(
         id: response['id'].toString(),
         name: response['name'],
       );
-
       _ref.invalidate(suppliersByCategoryProvider);
       _ref.invalidate(allSuppliersProvider);
 
@@ -142,10 +138,12 @@ final agreementControllerProvider =
     StateNotifierProvider.autoDispose<AgreementController, bool>((ref) {
   return AgreementController(ref: ref);
 });
+
 class AgreementController extends StateNotifier<bool> {
   final Ref _ref;
-  AgreementController({required Ref ref}) : _ref = ref, super(false);
-
+  AgreementController({required Ref ref})
+      : _ref = ref,
+        super(false);
   Future<bool> createFullAgreement({
     required BuildContext context,
     required String contactId,
@@ -183,25 +181,24 @@ class AgreementController extends StateNotifier<bool> {
         }
       }
 
+      // --- هذا هو التصحيح المهم ---
       final itemsList = items
           .map((item) => {
-                'productId': item.product,
-                'totalQuantity': item.totalQuantity,
-                'unitPrice': item.unitPrice,
-                'expectedDeliveryDate':
+                'product_id': item.product?.id,
+                'total_quantity': item.totalQuantity,
+                'unit_price': item.unitPrice,
+                'expected_delivery_date':
                     item.expectedDeliveryDate.toIso8601String(),
               })
           .toList();
-      await _ref.read(supabaseProvider).rpc(
-        'create_full_agreement',
-        params: {
-          'contact_id_input': contactId,
-          'notes_input': notes,
-          'items_jsonb_in': itemsList,
-          'down_payment_input': downPayment,
-          'document_urls_input': imagePaths,
-        },
-      );
+
+      await _ref.read(supabaseProvider).rpc('create_full_agreement', params: {
+        'p_contact_id': contactId,
+        'p_notes': notes,
+        'p_items_jsonb': itemsList,
+        'p_down_payment': downPayment,
+        'p_document_urls': imagePaths
+      });
       _ref.invalidate(agreementsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

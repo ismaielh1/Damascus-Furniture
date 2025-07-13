@@ -1,19 +1,17 @@
+// lib/features/suppliers/presentation/dialogs/add_agreement_item_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:syria_store/features/products/data/models/product_model.dart';
 import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
-import 'package:uuid/uuid.dart';
 
 class AddAgreementItemDialog extends ConsumerStatefulWidget {
   final ProductModel product;
-  final String agreementId; // ✅ أضفنا المعرف هنا
 
   const AddAgreementItemDialog({
     super.key,
     required this.product,
-    required this.agreementId,
   });
 
   @override
@@ -55,10 +53,10 @@ class _AddAgreementItemDialogState
 
   void _onSave() {
     if (_formKey.currentState!.validate()) {
+      // تم تعديل إنشاء الكائن ليتوافق مع الموديل الصحيح
       final newItem = AgreementItem(
-        id: const Uuid().v4(),
-        agreementId: widget.agreementId.toString(), // ✅ تحويل إلى String
-        productId: widget.product.id.toString(), // ✅ تحويل إلى String
+        id: 0, // ID مؤقت سيتم تجاهله
+        agreementId: '', // ID مؤقت سيتم تجاهله
         product: widget.product,
         totalQuantity: int.parse(_quantityController.text.trim()),
         unitPrice: double.parse(_priceController.text.trim()),
@@ -89,6 +87,7 @@ class _AddAgreementItemDialogState
                 validator: (val) =>
                     (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _priceController,
                 decoration: const InputDecoration(
@@ -101,6 +100,7 @@ class _AddAgreementItemDialogState
                 validator: (val) =>
                     (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 readOnly: true,
                 controller: TextEditingController(
