@@ -28,6 +28,7 @@ final supplierCategoriesProvider =
       .order('name');
   return response.map((item) => CategoryModel.fromJson(item)).toList();
 });
+
 final selectedCategoryProvider = StateProvider.autoDispose<CategoryModel?>(
   (ref) => null,
 );
@@ -66,6 +67,7 @@ class AgreementFormNotifier extends StateNotifier<List<AgreementItem>> {
   }
 
   double get grandTotal => state.fold(0.0, (sum, item) => sum + item.subtotal);
+
   void clear() {
     state = [];
   }
@@ -81,6 +83,7 @@ class AddSupplierController extends StateNotifier<bool> {
   AddSupplierController({required Ref ref})
       : _ref = ref,
         super(false);
+
   Future<Supplier?> addSupplier({
     required BuildContext context,
     required String name,
@@ -102,10 +105,12 @@ class AddSupplierController extends StateNotifier<bool> {
           'p_category_id': categoryId,
         },
       ).single();
+
       final newSupplier = Supplier(
         id: response['id'].toString(),
         name: response['name'],
       );
+
       _ref.invalidate(suppliersByCategoryProvider);
       _ref.invalidate(allSuppliersProvider);
 
@@ -122,7 +127,7 @@ class AddSupplierController extends StateNotifier<bool> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطأ في إضافة المورد: $e'),
+            content: Text('فشل إضافة المورد: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -144,6 +149,7 @@ class AgreementController extends StateNotifier<bool> {
   AgreementController({required Ref ref})
       : _ref = ref,
         super(false);
+
   Future<bool> createFullAgreement({
     required BuildContext context,
     required String contactId,
@@ -181,14 +187,14 @@ class AgreementController extends StateNotifier<bool> {
         }
       }
 
-      // --- هذا هو التصحيح المهم ---
       final itemsList = items
           .map((item) => {
                 'product_id': item.product?.id,
                 'total_quantity': item.totalQuantity,
                 'unit_price': item.unitPrice,
+                // V-- هذا هو التعديل المطلوب --V
                 'expected_delivery_date':
-                    item.expectedDeliveryDate.toIso8601String(),
+                    item.expectedDeliveryDate?.toIso8601String(),
               })
           .toList();
 
@@ -199,6 +205,7 @@ class AgreementController extends StateNotifier<bool> {
         'p_down_payment': downPayment,
         'p_document_urls': imagePaths
       });
+
       _ref.invalidate(agreementsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

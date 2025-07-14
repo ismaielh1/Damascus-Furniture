@@ -1,17 +1,18 @@
+// lib/features/suppliers/presentation/widgets/details/agreement_actions_panel.dart
 import 'package:flutter/material.dart';
 
 class AgreementActionsPanel extends StatelessWidget {
   final bool isUpdating;
-  final VoidCallback onMarkAsCompleted;
-  final VoidCallback onPostpone;
-  final VoidCallback onCancel;
+  final VoidCallback? onMarkAsCompleted;
+  final VoidCallback? onPostpone;
+  final VoidCallback? onCancel;
 
   const AgreementActionsPanel({
     super.key,
     required this.isUpdating,
-    required this.onMarkAsCompleted,
-    required this.onPostpone,
-    required this.onCancel,
+    this.onMarkAsCompleted,
+    this.onPostpone,
+    this.onCancel,
   });
 
   @override
@@ -58,7 +59,7 @@ class AgreementActionsPanel extends StatelessWidget {
   }
 
   Widget _buildActionButton({
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required IconData icon,
     required String label,
     required Color color,
@@ -73,6 +74,8 @@ class AgreementActionsPanel extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             foregroundColor: Colors.white,
+            // تجعل الزر باهتاً عند تعطيله
+            disabledBackgroundColor: color.withOpacity(0.5),
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),

@@ -40,18 +40,31 @@ class _EditAgreementItemDialogState
 
   void _onSave() {
     if (_formKey.currentState!.validate()) {
+      // --- بداية التعديل ---
+      // التأكد من أن معرف الاتفاقية ليس فارغاً
+      if (widget.item.agreementId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('خطأ: معرّف الاتفاقية مفقود')),
+        );
+        return;
+      }
+      // --- نهاية التعديل ---
+
       ref
           .read(updateAgreementStatusControllerProvider.notifier)
           .updateAgreementItem(
             context: context,
             itemId: widget.item.id,
-            agreementId: widget.item.agreementId, // الآن هذا الحقل موجود
+            // --- بداية التعديل ---
+            // استخدام علامة التعجب (!) لتأكيد أن القيمة ليست فارغة
+            agreementId: widget.item.agreementId!,
+            // --- نهاية التعديل ---
             newQuantity: int.parse(_quantityController.text),
             newPrice: double.parse(_priceController.text),
           )
           .then((success) {
-            if (success && mounted) Navigator.of(context).pop();
-          });
+        if (success && mounted) Navigator.of(context).pop();
+      });
     }
   }
 
@@ -73,8 +86,9 @@ class _EditAgreementItemDialogState
                 if (val == null || val.isEmpty) return 'الحقل مطلوب';
                 final quantity = int.tryParse(val);
                 if (quantity == null) return 'أدخل رقماً صحيحاً';
-                if (quantity < widget.item.receivedQuantitySoFar)
+                if (quantity < widget.item.receivedQuantitySoFar) {
                   return 'لا يمكن أن تكون الكمية أقل من المستلم';
+                }
                 return null;
               },
             ),

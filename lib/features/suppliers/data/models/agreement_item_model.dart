@@ -4,21 +4,21 @@ import 'package:syria_store/features/products/data/models/product_model.dart';
 
 class AgreementItem extends Equatable {
   final int id;
-  final String agreementId;
+  final String? agreementId; // تم التعديل ليقبل القيمة الفارغة
   final ProductModel? product;
   final int totalQuantity;
   final double unitPrice;
   final int receivedQuantitySoFar;
-  final DateTime expectedDeliveryDate;
+  final DateTime? expectedDeliveryDate; // تم التعديل ليقبل القيمة الفارغة
 
   const AgreementItem({
     required this.id,
-    required this.agreementId,
-    required this.product,
+    this.agreementId,
+    this.product,
     required this.totalQuantity,
     required this.unitPrice,
     required this.receivedQuantitySoFar,
-    required this.expectedDeliveryDate,
+    this.expectedDeliveryDate,
   });
 
   double get subtotal => totalQuantity * unitPrice;
@@ -43,7 +43,10 @@ class AgreementItem extends Equatable {
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
       receivedQuantitySoFar:
           (json['received_quantity_so_far'] as num?)?.toInt() ?? 0,
-      expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']),
+      // استخدام tryParse للتعامل مع القيم الفارغة بأمان
+      expectedDeliveryDate: json['expected_delivery_date'] != null
+          ? DateTime.tryParse(json['expected_delivery_date'])
+          : null,
     );
   }
 }

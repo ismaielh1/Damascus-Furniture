@@ -7589,3 +7589,2061 @@ class PaymentSectionWidget extends ConsumerWidget {
 }
 
 
+--- FILE: lib/features/invoices/data/models/fund_model.dart ---
+// lib/features/invoices/data/models/fund_model.dart
+import 'package:equatable/equatable.dart';
+
+class FundModel extends Equatable {
+  final int id;
+  final String name;
+  // -- بداية الإضافة --
+  final String currency; // 'USD' or 'SYP'
+  final String type; // 'cash' or 'bank'
+  // -- نهاية الإضافة --
+
+  const FundModel({
+    required this.id,
+    required this.name,
+    // -- بداية الإضافة --
+    required this.currency,
+    required this.type,
+    // -- نهاية الإضافة --
+  });
+
+  factory FundModel.fromJson(Map<String, dynamic> json) {
+    return FundModel(
+      id: json['id'],
+      name: json['name'],
+      // -- بداية الإضافة --
+      currency: json['currency'],
+      type: json['type'],
+      // -- نهاية الإضافة --
+    );
+  }
+
+  @override
+  // -- تعديل --
+  List<Object?> get props => [id, name, currency, type];
+}
+
+
+--- FILE: lib/features/invoices/data/models/invoice_item_model.dart ---
+// lib/features/invoices/data/models/invoice_item_model.dart
+import 'package:syria_store/features/products/data/models/product_model.dart';
+
+class InvoiceItemModel {
+  final ProductModel product;
+  int quantity;
+  double unitPrice;
+
+  InvoiceItemModel({
+    required this.product,
+    required this.quantity,
+    required this.unitPrice,
+  });
+
+  double get subtotal => quantity * unitPrice;
+}
+
+
+--- FILE: lib/features/invoices/data/models/invoice_model.dart ---
+// lib/features/invoices/data/models/invoice_model.dart
+import 'package:equatable/equatable.dart';
+
+enum InvoiceDeliveryStatus { pending, delivered }
+
+InvoiceDeliveryStatus _parseDeliveryStatus(String? status) {
+  switch (status) {
+    case 'delivered':
+      return InvoiceDeliveryStatus.delivered;
+    case 'pending':
+    default:
+      return InvoiceDeliveryStatus.pending;
+  }
+}
+
+class InvoiceModel extends Equatable {
+  final String id;
+  final String invoiceNumber;
+  final String? contactId; // <-- تمت الإضافة هنا
+  final String? customerName;
+  final String? userName;
+  final DateTime invoiceDate;
+  final double totalAmount;
+  final String paymentMethod;
+  final InvoiceDeliveryStatus deliveryStatus;
+  final double? discountAmount;
+  final String? notes;
+
+  const InvoiceModel({
+    required this.id,
+    required this.invoiceNumber,
+    this.contactId, // <-- تمت الإضافة هنا
+    this.customerName,
+    this.userName,
+    required this.invoiceDate,
+    required this.totalAmount,
+    required this.paymentMethod,
+    required this.deliveryStatus,
+    this.discountAmount,
+    this.notes,
+  });
+
+  factory InvoiceModel.fromJson(Map<String, dynamic> json) {
+    return InvoiceModel(
+      id: json['id'],
+      invoiceNumber: json['invoice_number'],
+      contactId: json['contact_id'], // <-- تمت الإضافة هنا
+      customerName: json['contacts']?['name'],
+      userName: json['profiles']?['full_name'],
+      invoiceDate: DateTime.parse(json['invoice_date']),
+      totalAmount: (json['total_amount'] as num).toDouble(),
+      paymentMethod: json['payment_method'],
+      deliveryStatus: _parseDeliveryStatus(json['delivery_status']),
+      discountAmount: (json['discount_amount'] as num?)?.toDouble(),
+      notes: json['notes'],
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, invoiceNumber, contactId, customerName, userName, invoiceDate];
+}
+
+
+--- FILE: lib/features/invoices/data/models/payment_detail_model.dart ---
+class PaymentDetailModel {
+  double amount;
+  String currency; // 'USD' or 'SYP'
+  double? exchangeRate;
+  int? fundId; // -- تمت الإضافة --
+
+  PaymentDetailModel({
+    required this.amount,
+    required this.currency,
+    this.exchangeRate,
+    this.fundId, // -- تمت الإضافة --
+  });
+}
+
+
+--- FILE: lib/features/invoices/presentation/pages/create_invoice_page.dart ---
+// lib/features/invoices/presentation/pages/create_invoice_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/branches/data/models/branch_model.dart';
+import 'package:syria_store/features/branches/presentation/providers/branches_provider.dart';
+import 'package:syria_store/features/customers/presentation/dialogs/add_edit_customer_dialog.dart';
+import 'package:syria_store/features/customers/presentation/providers/customers_provider.dart';
+import 'package:syria_store/features/invoices/data/models/fund_model.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_item_model.dart';
+import 'package:syria_store/features/invoices/data/models/payment_detail_model.dart';
+import 'package:syria_store/features/invoices/presentation/providers/employees_provider.dart';
+import 'package:syria_store/features/invoices/presentation/providers/funds_provider.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/customer_section_widget.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/invoice_items_section_widget.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/invoice_summary_widget.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/payment_section_widget.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/settings/presentation/providers/settings_provider.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+
+class CreateInvoicePage extends ConsumerStatefulWidget {
+  const CreateInvoicePage({super.key});
+
+  @override
+  ConsumerState<CreateInvoicePage> createState() => _CreateInvoicePageState();
+}
+
+class _CreateInvoicePageState extends ConsumerState<CreateInvoicePage> {
+  bool _isWalkInCustomer = true;
+  FundModel? _selectedUsdFund;
+  FundModel? _selectedSypFund;
+
+  final _discountController = TextEditingController();
+  final _usdPaymentController = TextEditingController();
+  final _sypPaymentController = TextEditingController();
+  final _notesController = TextEditingController();
+  final _manualInvoiceController = TextEditingController();
+  final _customerAutocompleteController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      final employees = ref.read(employeesProvider).valueOrNull;
+      if (employees != null && employees.isNotEmpty) {
+        ref.read(selectedEmployeeProvider.notifier).state = employees.first;
+      }
+      final branches = ref.read(branchesProvider).valueOrNull;
+      if (branches != null && branches.isNotEmpty) {
+        final mainBranch = branches.firstWhere(
+          (b) => b.isMain,
+          orElse: () => branches.first,
+        );
+        ref.read(selectedBranchProvider.notifier).state = mainBranch;
+      }
+    });
+
+    _discountController.addListener(() {
+      final discount = double.tryParse(_discountController.text) ?? 0.0;
+      ref.read(invoiceFormProvider.notifier).setDiscount(discount);
+    });
+  }
+
+  @override
+  void dispose() {
+    _discountController.dispose();
+    _usdPaymentController.dispose();
+    _sypPaymentController.dispose();
+    _notesController.dispose();
+    _manualInvoiceController.dispose();
+    _customerAutocompleteController.dispose();
+    super.dispose();
+  }
+
+  void _onSaveInvoice() {
+    final invoiceState = ref.read(invoiceFormProvider);
+    final selectedBranch = ref.read(selectedBranchProvider);
+    final selectedEmployee = ref.read(selectedEmployeeProvider);
+    final latestRate =
+        ref.read(latestExchangeRateProvider).value?.rateUsdToSyp ?? 0.0;
+
+    // -- بداية التعديل --
+    // 1. إنشاء قائمة الدفعات بشكل منفصل
+    final List<PaymentDetailModel> payments = [];
+    final double usdAmount = double.tryParse(_usdPaymentController.text) ?? 0.0;
+    if (usdAmount > 0) {
+      payments.add(
+        PaymentDetailModel(
+          amount: usdAmount,
+          currency: 'USD',
+          fundId: _selectedUsdFund?.id,
+        ),
+      );
+    }
+
+    final double sypAmount = double.tryParse(_sypPaymentController.text) ?? 0.0;
+    if (sypAmount > 0) {
+      if (latestRate == 0.0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('الرجاء تحديد سعر صرف صالح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      payments.add(
+        PaymentDetailModel(
+          amount: sypAmount,
+          currency: 'SYP',
+          exchangeRate: latestRate,
+          fundId: _selectedSypFund?.id,
+        ),
+      );
+    }
+    // -- نهاية التعديل --
+
+    // ... (Validation logic can be added here)
+
+    ref
+        .read(invoiceControllerProvider.notifier)
+        .saveInvoice(
+          context,
+          // 2. تمرير القائمة الجاهزة
+          invoiceState: invoiceState.copyWith(
+            notes: _notesController.text.trim(),
+            manualInvoiceNumber: _manualInvoiceController.text.trim(),
+            payments: payments,
+          ),
+          exchangeRate: latestRate,
+          branchId: selectedBranch!.id,
+          userId: selectedEmployee!.id,
+        )
+        .then((success) {
+          if (success) _resetForm();
+        });
+  }
+
+  void _resetForm() {
+    ref.read(invoiceFormProvider.notifier).clearForm();
+    _discountController.clear();
+    _usdPaymentController.clear();
+    _sypPaymentController.clear();
+    _notesController.clear();
+    _manualInvoiceController.clear();
+    _customerAutocompleteController.clear();
+    setState(() {
+      _isWalkInCustomer = true;
+      _selectedUsdFund = null;
+      _selectedSypFund = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final invoiceState = ref.watch(invoiceFormProvider);
+    final isSaving = ref.watch(invoiceControllerProvider);
+    final totalAfterDiscount = invoiceState.totalAfterDiscount;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        title: _buildBranchSelector(),
+        actions: [
+          _buildExchangeRateDisplay(),
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            onPressed: _resetForm,
+            tooltip: 'فاتورة جديدة',
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
+                child: ref
+                    .watch(employeesProvider)
+                    .when(
+                      data: (employees) =>
+                          DropdownButtonFormField<ContactModel>(
+                            value: ref.watch(selectedEmployeeProvider),
+                            decoration: const InputDecoration(
+                              labelText: 'البائع',
+                              border: InputBorder.none,
+                            ),
+                            items: employees
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(e.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (employee) =>
+                                ref
+                                        .read(selectedEmployeeProvider.notifier)
+                                        .state =
+                                    employee,
+                          ),
+                      loading: () => const Text('جاري تحميل الموظفين...'),
+                      error: (e, s) => const Text('خطأ في تحميل الموظفين'),
+                    ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            CustomerSectionWidget(
+              isWalkInCustomer: _isWalkInCustomer,
+              onWalkInCustomerChanged: (value) {
+                setState(() {
+                  _isWalkInCustomer = value ?? true;
+                  if (_isWalkInCustomer) {
+                    ref.read(invoiceFormProvider.notifier).setCustomer(null);
+                    _customerAutocompleteController.clear();
+                  }
+                });
+              },
+              manualInvoiceController: _manualInvoiceController,
+              customerAutocompleteController: _customerAutocompleteController,
+            ),
+            const SizedBox(height: 24),
+
+            const InvoiceItemsSectionWidget(),
+            const SizedBox(height: 24),
+
+            InvoiceSummaryWidget(
+              discountController: _discountController,
+              totalAfterDiscount: totalAfterDiscount,
+            ),
+            const SizedBox(height: 24),
+
+            PaymentSectionWidget(
+              usdPaymentController: _usdPaymentController,
+              sypPaymentController: _sypPaymentController,
+              selectedUsdFund: _selectedUsdFund,
+              selectedSypFund: _selectedSypFund,
+              onUsdFundChanged: (fund) =>
+                  setState(() => _selectedUsdFund = fund),
+              onSypFundChanged: (fund) =>
+                  setState(() => _selectedSypFund = fund),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'ملاحظات على الفاتورة',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 32),
+
+            ElevatedButton.icon(
+              onPressed: isSaving || invoiceState.items.isEmpty
+                  ? null
+                  : _onSaveInvoice,
+              icon: isSaving ? const SizedBox.shrink() : const Icon(Icons.save),
+              label: isSaving
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(color: Colors.white),
+                    )
+                  : const Text('حفظ الفاتورة'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: theme.textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBranchSelector() {
+    final branchesAsync = ref.watch(branchesProvider);
+    final selectedBranch = ref.watch(selectedBranchProvider);
+    return branchesAsync.when(
+      data: (branches) {
+        if (selectedBranch == null && branches.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final mainBranch = branches.firstWhere(
+                (b) => b.isMain,
+                orElse: () => branches.first,
+              );
+              ref.read(selectedBranchProvider.notifier).state = mainBranch;
+            }
+          });
+        }
+        return DropdownButton<BranchModel>(
+          value: selectedBranch,
+          hint: const Text('اختر الفرع', style: TextStyle(color: Colors.white)),
+          isExpanded: false,
+          underline: const SizedBox.shrink(),
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: Colors.white),
+          dropdownColor: Theme.of(context).primaryColor,
+          items: branches
+              .map(
+                (branch) => DropdownMenuItem<BranchModel>(
+                  value: branch,
+                  child: Text(branch.name),
+                ),
+              )
+              .toList(),
+          onChanged: (branch) =>
+              ref.read(selectedBranchProvider.notifier).state = branch,
+        );
+      },
+      loading: () => const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+      ),
+      error: (e, s) => const Icon(Icons.error, color: Colors.red),
+    );
+  }
+
+  Widget _buildExchangeRateDisplay() {
+    final theme = Theme.of(context);
+    final latestRateAsync = ref.watch(latestExchangeRateProvider);
+    return latestRateAsync.when(
+      data: (rate) => rate == null
+          ? const Tooltip(
+              message: 'لم يتم تحديد سعر صرف',
+              child: Icon(Icons.warning, color: Colors.yellow),
+            )
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Center(
+                child: Text(
+                  'سعر الصرف: ${rate.rateUsdToSyp}',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+      loading: () => const SizedBox.shrink(),
+      error: (err, stack) => const Tooltip(
+        message: 'خطأ في جلب سعر الصرف',
+        child: Icon(Icons.error, color: Colors.red),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/pages/invoices_list_page.dart ---
+// lib/features/invoices/presentation/pages/invoices_list_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoices_list_provider.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/invoice_card.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/invoice_filters.dart';
+
+class InvoicesListPage extends ConsumerWidget {
+  const InvoicesListPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invoicesAsync = ref.watch(invoicesProvider);
+
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('سجل المبيعات'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push('/create-invoice'),
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'فاتورة جديدة',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          const InvoiceFilters(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(invoicesProvider.future),
+              child: invoicesAsync.when(
+                data: (invoices) {
+                  if (invoices.isEmpty) {
+                    return LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          child: const Center(child: Text('لا توجد فواتير تطابق هذا البحث.')),
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: invoices.length,
+                    itemBuilder: (context, index) => InvoiceCard(invoice: invoices[index]),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(child: Text('حدث خطأ: \${err.toString()}')),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/pages/invoice_details_page.dart ---
+// lib/features/invoices/presentation/pages/invoice_details_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoices_list_provider.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/details/invoice_financial_summary.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/details/invoice_header_details.dart';
+import 'package:syria_store/features/invoices/presentation/widgets/details/invoice_items_list_details.dart';
+
+class InvoiceDetailsPage extends ConsumerWidget {
+  final String invoiceId;
+  const InvoiceDetailsPage({super.key, required this.invoiceId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invoiceAsync = ref.watch(invoiceDetailsProvider(invoiceId));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('تفاصيل الفاتورة')),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(invoiceDetailsProvider(invoiceId));
+          ref.invalidate(invoiceItemsProvider(invoiceId));
+        },
+        child: invoiceAsync.when(
+          data: (invoice) {
+            if (invoice == null) {
+              return const Center(child: Text('لم يتم العثور على الفاتورة.'));
+            }
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InvoiceHeaderDetails(invoice: invoice),
+                  const SizedBox(height: 24),
+                  InvoiceItemsListDetails(invoiceId: invoice.id),
+                  const SizedBox(height: 24),
+                  InvoiceFinancialSummary(invoice: invoice),
+                ],
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Center(child: Text('خطأ في جلب تفاصيل الفاتورة: $err')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/providers/employees_provider.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+final employeesProvider = FutureProvider.autoDispose<List<ContactModel>>((ref) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase.from('profiles').select('id, full_name');
+    
+    return response.map((item) => ContactModel(
+      id: item['id'], 
+      name: item['full_name'] ?? 'موظف غير مسمى',
+      isSupplier: false,
+      isCustomer: false,
+    )).toList();
+  } catch (e) {
+    print('Error fetching employees: $e');
+    rethrow;
+  }
+});
+
+final selectedEmployeeProvider = StateProvider<ContactModel?>((ref) => null);
+
+final employeeControllerProvider = StateNotifierProvider.autoDispose<EmployeeController, bool>((ref) {
+  return EmployeeController(ref);
+});
+
+class EmployeeController extends StateNotifier<bool> {
+  final Ref _ref;
+  EmployeeController(this._ref) : super(false);
+
+  Future<bool> addEmployee(BuildContext context, {required String fullName}) async {
+    state = true;
+    try {
+      await _ref.read(supabaseProvider).from('profiles').insert({'full_name': fullName});
+      _ref.invalidate(employeesProvider);
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تمت إضافة الموظف بنجاح'),
+            backgroundColor: Colors.green));
+      }
+      return true;
+    } catch(e) {
+       if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('فشل إضافة الموظف: $e'),
+            backgroundColor: Colors.red));
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/providers/funds_provider.dart ---
+// lib/features/invoices/presentation/providers/funds_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/data/models/fund_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+// Provider رئيسي لجلب كل الصناديق مرة واحدة
+final allFundsProvider = FutureProvider.autoDispose<List<FundModel>>((
+  ref,
+) async {
+  final supabase = ref.watch(supabaseProvider);
+  final response = await supabase.from('funds').select();
+  return response.map((item) => FundModel.fromJson(item)).toList();
+});
+
+// Provider لفلترة صناديق الدولار فقط
+final usdFundsProvider = Provider.autoDispose<List<FundModel>>((ref) {
+  final allFunds = ref.watch(allFundsProvider).value;
+  if (allFunds == null) return [];
+  return allFunds.where((fund) => fund.currency == 'USD').toList();
+});
+
+// Provider لفلترة صناديق الليرة السورية فقط
+final sypFundsProvider = Provider.autoDispose<List<FundModel>>((ref) {
+  final allFunds = ref.watch(allFundsProvider).value;
+  if (allFunds == null) return [];
+  return allFunds.where((fund) => fund.currency == 'SYP').toList();
+});
+
+
+--- FILE: lib/features/invoices/presentation/providers/invoices_list_provider.dart ---
+// lib/features/invoices/presentation/providers/invoices_list_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_item_model.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+// Providers for search and filtering
+final invoiceSearchQueryProvider =
+    StateProvider.autoDispose<String>((ref) => '');
+final invoicePaymentMethodFilterProvider =
+    StateProvider.autoDispose<String?>((ref) => null);
+final invoiceDeliveryStatusFilterProvider =
+    StateProvider.autoDispose<String?>((ref) => null);
+
+// Provider to fetch all invoices using the RPC function
+final invoicesProvider =
+    FutureProvider.autoDispose<List<InvoiceModel>>((ref) async {
+  final supabase = ref.watch(supabaseProvider);
+  final searchQuery = ref.watch(invoiceSearchQueryProvider);
+  final paymentMethod = ref.watch(invoicePaymentMethodFilterProvider);
+  final deliveryStatus = ref.watch(invoiceDeliveryStatusFilterProvider);
+
+  try {
+    final response = await supabase.rpc(
+      'search_invoices',
+      params: {
+        'p_search_query': searchQuery,
+        'p_payment_method_filter': paymentMethod,
+        'p_delivery_status_filter': deliveryStatus,
+      },
+    ).select('*, contacts(id, name), profiles(id, full_name)');
+
+    // --- بداية الإضافة: طباعة البيانات الخام للفحص ---
+    print('Raw Supabase Response for Invoices: $response');
+    // --- نهاية الإضافة ---
+
+    final List<Map<String, dynamic>> data = List.from(response);
+    return data.map((item) => InvoiceModel.fromJson(item)).toList();
+  } catch (e, s) {
+    print('Error fetching invoices: $e');
+    print('Stacktrace: $s');
+    rethrow;
+  }
+});
+
+// Provider to fetch details of a single invoice
+final invoiceDetailsProvider = FutureProvider.autoDispose
+    .family<InvoiceModel?, String>((ref, invoiceId) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase
+        .from('invoices')
+        .select('*, contacts(id, name), profiles(id, full_name)')
+        .eq('id', invoiceId)
+        .single();
+    return InvoiceModel.fromJson(response);
+  } catch (e) {
+    print('Error fetching invoice details: $e');
+    return null;
+  }
+});
+
+// Provider to fetch items of a specific invoice
+final invoiceItemsProvider = FutureProvider.autoDispose
+    .family<List<InvoiceItemModel>, String>((ref, invoiceId) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase
+        .from('invoice_items')
+        .select('*, products(*)')
+        .eq('invoice_id', invoiceId);
+
+    return response.map((item) {
+      return InvoiceItemModel(
+        product: ProductModel.fromJson(item['products']),
+        quantity: item['quantity'],
+        unitPrice: (item['unit_price'] as num).toDouble(),
+      );
+    }).toList();
+  } catch (e) {
+    print('Error fetching invoice items: $e');
+    rethrow;
+  }
+});
+
+
+--- FILE: lib/features/invoices/presentation/providers/invoice_provider.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_item_model.dart';
+import 'package:syria_store/features/invoices/data/models/payment_detail_model.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+@immutable
+class InvoiceFormState {
+  final ContactModel? selectedCustomer;
+  final List<InvoiceItemModel> items;
+  final double discount;
+  final String paymentMethod;
+  final List<PaymentDetailModel> payments;
+  final String notes;
+  final String? manualInvoiceNumber;
+  final DateTime invoiceDate;
+  final String deliveryStatus;
+
+  InvoiceFormState({
+    this.selectedCustomer,
+    this.items = const [],
+    this.discount = 0.0,
+    this.paymentMethod = 'cash',
+    this.payments = const [],
+    this.notes = '',
+    this.manualInvoiceNumber,
+    DateTime? invoiceDate,
+    this.deliveryStatus = 'delivered',
+  }) : invoiceDate = invoiceDate ?? DateTime.now();
+
+  double get subtotal => items.fold(0, (sum, item) => sum + item.subtotal);
+  double get totalAfterDiscount => subtotal - discount;
+
+  InvoiceFormState copyWith({
+    ContactModel? selectedCustomer,
+    bool clearCustomer = false,
+    List<InvoiceItemModel>? items,
+    double? discount,
+    String? paymentMethod,
+    List<PaymentDetailModel>? payments,
+    String? notes,
+    String? manualInvoiceNumber,
+    DateTime? invoiceDate,
+    String? deliveryStatus,
+  }) {
+    return InvoiceFormState(
+      selectedCustomer:
+          clearCustomer ? null : selectedCustomer ?? this.selectedCustomer,
+      items: items ?? this.items,
+      discount: discount ?? this.discount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      payments: payments ?? this.payments,
+      notes: notes ?? this.notes,
+      manualInvoiceNumber: manualInvoiceNumber ?? this.manualInvoiceNumber,
+      invoiceDate: invoiceDate ?? this.invoiceDate,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+    );
+  }
+}
+
+final invoiceFormProvider =
+    StateNotifierProvider.autoDispose<InvoiceFormNotifier, InvoiceFormState>(
+        (ref) {
+  return InvoiceFormNotifier();
+});
+
+class InvoiceFormNotifier extends StateNotifier<InvoiceFormState> {
+  InvoiceFormNotifier() : super(InvoiceFormState());
+
+  void setInvoiceDate(DateTime date) {
+    state = state.copyWith(invoiceDate: date);
+  }
+
+  void setDeliveryStatus(String status) {
+    state = state.copyWith(deliveryStatus: status);
+  }
+
+  void setCustomer(ContactModel? customer) {
+    state = state.copyWith(
+        selectedCustomer: customer, clearCustomer: customer == null);
+  }
+
+  void setManualInvoiceNumber(String? number) {
+    state = state.copyWith(manualInvoiceNumber: number);
+  }
+
+  void addItem(InvoiceItemModel newItem) {
+    final existingIndex =
+        state.items.indexWhere((item) => item.product.id == newItem.product.id);
+    if (existingIndex != -1) {
+      final updatedItems = List<InvoiceItemModel>.from(state.items);
+      updatedItems[existingIndex].quantity += newItem.quantity;
+      state = state.copyWith(items: updatedItems);
+    } else {
+      state = state.copyWith(items: [...state.items, newItem]);
+    }
+  }
+
+  void removeItem(String productId) {
+    state = state.copyWith(
+        items:
+            state.items.where((item) => item.product.id != productId).toList());
+  }
+
+  void updateItemQuantity(String productId, int newQuantity) {
+    state = state.copyWith(
+        items: state.items.map((item) {
+      if (item.product.id == productId) {
+        item.quantity = newQuantity < 0 ? 0 : newQuantity;
+      }
+      return item;
+    }).toList());
+  }
+
+  void updateItemPrice(String productId, double newPrice) {
+    state = state.copyWith(
+        items: state.items.map((item) {
+      if (item.product.id == productId) {
+        item.unitPrice = newPrice;
+      }
+      return item;
+    }).toList());
+  }
+
+  // --- بداية الإضافة: الدالة الجديدة التي لا تحذف الدوال القديمة ---
+  void updateItem(String productId, int newQuantity, double newPrice) {
+    final updatedItems = state.items.map((item) {
+      if (item.product.id == productId) {
+        // نُنشئ نسخة جديدة من العنصر بالقيم المحدثة لضمان تحديث الواجهة بشكل صحيح
+        return InvoiceItemModel(
+          product: item.product,
+          quantity: newQuantity >= 0 ? newQuantity : 0,
+          unitPrice: newPrice,
+        );
+      }
+      return item;
+    }).toList();
+    state = state.copyWith(items: updatedItems);
+  }
+  // --- نهاية الإضافة ---
+
+  void setDiscount(double discount) {
+    state = state.copyWith(discount: discount);
+  }
+
+  void setPaymentMethod(String method) {
+    state = state.copyWith(paymentMethod: method);
+  }
+
+  void setNotes(String notes) {
+    state = state.copyWith(notes: notes);
+  }
+
+  void addPayment(PaymentDetailModel payment) {
+    state = state.copyWith(payments: [...state.payments, payment]);
+  }
+
+  void clearPayments() {
+    state = state.copyWith(payments: []);
+  }
+
+  void clearForm() {
+    state = InvoiceFormState();
+  }
+}
+
+final invoiceControllerProvider =
+    StateNotifierProvider.autoDispose<InvoiceController, bool>((ref) {
+  return InvoiceController(ref);
+});
+
+class InvoiceController extends StateNotifier<bool> {
+  final Ref _ref;
+  InvoiceController(this._ref) : super(false);
+
+  Future<bool> saveInvoice(
+    BuildContext context, {
+    required InvoiceFormState invoiceState,
+    required double exchangeRate,
+    required String branchId,
+    required String userId,
+    int? usdFundId,
+    int? sypFundId,
+  }) async {
+    state = true;
+    try {
+      final itemsJson = invoiceState.items
+          .map((item) => {
+                'product_id': item.product.id,
+                'quantity': item.quantity,
+                'unit_price': item.unitPrice,
+              })
+          .toList();
+
+      final paymentsJson = invoiceState.payments
+          .map((p) => {
+                'amount': p.amount,
+                'currency': p.currency,
+                'exchange_rate': p.currency == 'SYP' ? exchangeRate : null,
+                'fund_id': p.currency == 'USD' ? usdFundId : sypFundId,
+              })
+          .toList();
+
+      await _ref.read(supabaseProvider).rpc('create_full_invoice', params: {
+        'p_branch_id': branchId,
+        'p_user_id': userId,
+        'p_contact_id': invoiceState.selectedCustomer?.id,
+        'p_payment_method': invoiceState.paymentMethod,
+        'p_discount_amount': invoiceState.discount,
+        'p_notes': invoiceState.notes,
+        'p_invoice_number_manual': invoiceState.manualInvoiceNumber,
+        'p_invoice_date': invoiceState.invoiceDate.toIso8601String(),
+        'p_delivery_status': invoiceState.deliveryStatus,
+        'p_items_jsonb': itemsJson,
+        'p_payment_jsonb': paymentsJson
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تم حفظ الفاتورة بنجاح'),
+            backgroundColor: Colors.green));
+      }
+      _ref.read(invoiceFormProvider.notifier).clearForm();
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('فشل حفظ الفاتورة: $e'),
+            backgroundColor: Colors.red));
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/customer_section_widget.dart ---
+// lib/features/invoices/presentation/widgets/customer_section_widget.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/customers/presentation/dialogs/add_edit_customer_dialog.dart';
+import 'package:syria_store/features/customers/presentation/providers/customers_provider.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+
+class CustomerSectionWidget extends ConsumerStatefulWidget {
+  final bool isWalkInCustomer;
+  final ValueChanged<bool?> onWalkInCustomerChanged;
+  final TextEditingController manualInvoiceController;
+
+  const CustomerSectionWidget({
+    super.key,
+    required this.isWalkInCustomer,
+    required this.onWalkInCustomerChanged,
+    required this.manualInvoiceController, required TextEditingController customerAutocompleteController,
+  });
+
+  @override
+  ConsumerState<CustomerSectionWidget> createState() =>
+      _CustomerSectionWidgetState();
+}
+
+class _CustomerSectionWidgetState extends ConsumerState<CustomerSectionWidget> {
+  final _autocompleteController = TextEditingController();
+  final _autocompleteFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // يستمع للتغيرات خارج نطاق التركيز ليتحقق من صحة الإدخال
+    _autocompleteFocusNode.addListener(() {
+      if (!_autocompleteFocusNode.hasFocus) {
+        // إذا كان النص لا يطابق العميل المختار، قم بمسح كل شيء
+        final selectedCustomer = ref.read(invoiceFormProvider).selectedCustomer;
+        if (selectedCustomer == null ||
+            _autocompleteController.text != selectedCustomer.name) {
+          _autocompleteController.clear();
+          ref.read(invoiceFormProvider.notifier).setCustomer(null);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autocompleteController.dispose();
+    _autocompleteFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final invoiceState = ref.watch(invoiceFormProvider);
+
+    // تحديث النص في الحقل إذا تم اختيار عميل
+    final selectedCustomer = invoiceState.selectedCustomer;
+    if (selectedCustomer != null &&
+        _autocompleteController.text != selectedCustomer.name) {
+      _autocompleteController.text = selectedCustomer.name;
+    }
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('معلومات العميل والفاتورة', style: theme.textTheme.titleLarge),
+            const Divider(),
+            Row(
+              children: [
+                Expanded(
+                    child: TextFormField(
+                        controller: widget.manualInvoiceController,
+                        decoration: const InputDecoration(
+                            labelText: 'رقم الفاتورة (اختياري)'))),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    readOnly: true,
+                    controller: TextEditingController(
+                        text: DateFormat('yyyy/MM/dd')
+                            .format(invoiceState.invoiceDate)),
+                    decoration:
+                        const InputDecoration(labelText: 'تاريخ الفاتورة'),
+                    onTap: () async {
+                      final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2101));
+                      if (pickedDate != null) {
+                        ref
+                            .read(invoiceFormProvider.notifier)
+                            .setInvoiceDate(pickedDate);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              title: const Text('زبون عابر (بدون اسم)'),
+              value: widget.isWalkInCustomer,
+              onChanged: widget.onWalkInCustomerChanged,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            if (!widget.isWalkInCustomer)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Autocomplete<ContactModel>(
+                      displayStringForOption: (ContactModel option) =>
+                          option.name,
+                      optionsBuilder:
+                          (TextEditingValue textEditingValue) async {
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<ContactModel>.empty();
+                        }
+                        final options = await ref.watch(
+                            customerAutocompleteProvider(textEditingValue.text)
+                                .future);
+                        // الاختيار التلقائي إذا كانت هناك نتيجة واحدة
+                        if (options.length == 1) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            ref
+                                .read(invoiceFormProvider.notifier)
+                                .setCustomer(options.first);
+                          });
+                        }
+                        return options;
+                      },
+                      onSelected: (ContactModel selection) {
+                        ref
+                            .read(invoiceFormProvider.notifier)
+                            .setCustomer(selection);
+                        _autocompleteController.text = selection.name;
+                      },
+                      fieldViewBuilder: (context, fieldController,
+                          fieldFocusNode, onFieldSubmitted) {
+                        // استخدام المتحكمات الخاصة بنا
+                        _autocompleteController.addListener(() {
+                          fieldController.text = _autocompleteController.text;
+                        });
+                        _autocompleteFocusNode.addListener(() {
+                          if (_autocompleteFocusNode.hasFocus) {
+                            fieldFocusNode.requestFocus();
+                          } else {
+                            fieldFocusNode.unfocus();
+                          }
+                        });
+
+                        return TextFormField(
+                          controller: fieldController,
+                          focusNode: fieldFocusNode,
+                          decoration: const InputDecoration(
+                              labelText: 'ابحث عن اسم العميل أو رقمه',
+                              hintText: 'اكتب للبحث...'),
+                          onFieldSubmitted: (_) => onFieldSubmitted(),
+                        );
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => showDialog(
+                        context: context,
+                        builder: (_) => const AddEditCustomerDialog()),
+                    tooltip: 'إضافة عميل جديد',
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/details/invoice_financial_summary.dart ---
+// lib/features/invoices/presentation/widgets/details/invoice_financial_summary.dart
+import 'package:flutter/material.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
+
+class InvoiceFinancialSummary extends StatelessWidget {
+  final InvoiceModel invoice;
+  const InvoiceFinancialSummary({super.key, required this.invoice});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtotal = invoice.totalAmount + (invoice.discountAmount ?? 0);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildFinancialRow(theme, 'المجموع الفرعي:', '\$${subtotal.toStringAsFixed(2)}'),
+            _buildFinancialRow(theme, 'الخصم:', '-\$${(invoice.discountAmount ?? 0).toStringAsFixed(2)}'),
+            const Divider(),
+            _buildFinancialRow(
+              theme,
+              'المجموع النهائي:',
+              '\$${invoice.totalAmount.toStringAsFixed(2)}',
+              isTotal: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancialRow(ThemeData theme, String title, String value, {bool isTotal = false}) {
+    final style = isTotal
+        ? theme.textTheme.titleLarge?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold)
+        : theme.textTheme.bodyLarge;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: style),
+          Text(value, style: style),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/details/invoice_header_details.dart ---
+// lib/features/invoices/presentation/widgets/details/invoice_header_details.dart
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
+
+class InvoiceHeaderDetails extends StatelessWidget {
+  final InvoiceModel invoice;
+  const InvoiceHeaderDetails({super.key, required this.invoice});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('فاتورة مبيعات', style: theme.textTheme.headlineSmall),
+                Chip(label: Text(invoice.paymentMethod == 'cash' ? 'نقدي' : 'آجل')),
+              ],
+            ),
+            const Divider(),
+            _buildInfoRow(context, Icons.person_outline, 'العميل:', invoice.customerName ?? 'زبون عابر'),
+            _buildInfoRow(context, Icons.confirmation_number_outlined, 'رقم الفاتورة:', invoice.invoiceNumber),
+            _buildInfoRow(context, Icons.calendar_today_outlined, 'تاريخ الفاتورة:', DateFormat('yyyy/MM/dd').format(invoice.invoiceDate)),
+            _buildInfoRow(context, Icons.badge_outlined, 'البائع:', invoice.userName ?? 'غير محدد'),
+            if (invoice.notes != null && invoice.notes!.isNotEmpty)
+              _buildInfoRow(context, Icons.note_alt_outlined, 'ملاحظات:', invoice.notes!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(BuildContext context, IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).primaryColor),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyLarge)),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/details/invoice_items_list_details.dart ---
+// lib/features/invoices/presentation/widgets/details/invoice_items_list_details.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoices_list_provider.dart';
+
+class InvoiceItemsListDetails extends ConsumerWidget {
+  final String invoiceId;
+  const InvoiceItemsListDetails({super.key, required this.invoiceId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemsAsync = ref.watch(invoiceItemsProvider(invoiceId));
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('البنود', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 8),
+        itemsAsync.when(
+          data: (items) {
+            return Card(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return ListTile(
+                    leading: CircleAvatar(child: Text('${index + 1}')),
+                    title: Text(item.product.name),
+                    subtitle: Text('الكمية: ${item.quantity} × السعر: \$${item.unitPrice.toStringAsFixed(2)}'),
+                    trailing: Text('\$${item.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  );
+                },
+                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('خطأ في جلب البنود: $e'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/invoice_card.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
+// --- بداية الإضافة: استيراد الملف الذي يحتوي على الـ provider ---
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
+// --- نهاية الإضافة ---
+
+class InvoiceCard extends ConsumerWidget {
+  final InvoiceModel invoice;
+
+  const InvoiceCard({super.key, required this.invoice});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    final financialSummaryAsync = invoice.contactId != null
+        ? ref.watch(contactFinancialSummaryProvider(invoice.contactId!))
+        : null;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '#${invoice.invoiceNumber}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  DateFormat('yyyy-MM-dd').format(invoice.invoiceDate),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+            const Divider(),
+            Text('العميل: ${invoice.customerName ?? "زبون عابر"}'),
+            Text(
+              'المبلغ الإجمالي: ${NumberFormat.simpleCurrency(locale: 'en_US').format(invoice.totalAmount)}',
+            ),
+            const SizedBox(height: 8),
+            if (financialSummaryAsync != null)
+              financialSummaryAsync.when(
+                data: (summary) {
+                  final balance = summary.balance;
+                  if (balance == 0 && invoice.paymentMethod == 'cash') {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'الرصيد الإجمالي للعميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(balance)}',
+                      style: TextStyle(
+                        color: balance > 0
+                            ? Colors.red.shade700
+                            : Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (err, stack) => Text(
+                  'خطأ في تحميل البيانات المالية',
+                  style: TextStyle(color: Colors.red.shade700),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/invoice_filters.dart ---
+// lib/features/invoices/presentation/widgets/invoice_filters.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoices_list_provider.dart';
+
+class InvoiceFilters extends ConsumerStatefulWidget {
+  const InvoiceFilters({super.key});
+
+  @override
+  ConsumerState<InvoiceFilters> createState() => _InvoiceFiltersState();
+}
+
+class _InvoiceFiltersState extends ConsumerState<InvoiceFilters> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(invoiceSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final paymentFilter = ref.watch(invoicePaymentMethodFilterProvider);
+    final deliveryFilter = ref.watch(invoiceDeliveryStatusFilterProvider);
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              hintText: 'ابحث برقم الفاتورة، اسم العميل...',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) {
+              ref.read(invoiceSearchQueryProvider.notifier).state = value;
+            },
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            alignment: WrapAlignment.center,
+            children: [
+              FilterChip(
+                label: const Text('الكل'),
+                selected: paymentFilter == null && deliveryFilter == null,
+                onSelected: (_) {
+                  ref.read(invoicePaymentMethodFilterProvider.notifier).state = null;
+                  ref.read(invoiceDeliveryStatusFilterProvider.notifier).state = null;
+                },
+              ),
+              FilterChip(
+                label: const Text('نقدي'),
+                selected: paymentFilter == 'cash',
+                onSelected: (selected) => ref.read(invoicePaymentMethodFilterProvider.notifier).state = selected ? 'cash' : null,
+              ),
+              FilterChip(
+                label: const Text('آجل'),
+                selected: paymentFilter == 'credit',
+                onSelected: (selected) => ref.read(invoicePaymentMethodFilterProvider.notifier).state = selected ? 'credit' : null,
+              ),
+              FilterChip(
+                label: const Text('تم التسليم'),
+                selected: deliveryFilter == 'delivered',
+                backgroundColor: Colors.green.withOpacity(0.1),
+                selectedColor: Colors.green.shade700,
+                onSelected: (selected) => ref.read(invoiceDeliveryStatusFilterProvider.notifier).state = selected ? 'delivered' : null,
+              ),
+              FilterChip(
+                label: const Text('قيد التسليم'),
+                selected: deliveryFilter == 'pending',
+                backgroundColor: Colors.orange.withOpacity(0.1),
+                selectedColor: Colors.orange.shade700,
+                onSelected: (selected) => ref.read(invoiceDeliveryStatusFilterProvider.notifier).state = selected ? 'pending' : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/invoice_items_section_widget.dart ---
+// lib/features/invoices/presentation/widgets/invoice_items_section_widget.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/features/invoices/data/models/invoice_item_model.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+
+class InvoiceItemsSectionWidget extends ConsumerWidget {
+  const InvoiceItemsSectionWidget({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final items = ref.watch(invoiceFormProvider).items;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('بنود الفاتورة', style: theme.textTheme.titleLarge),
+            FilledButton.icon(
+              onPressed: () async {
+                final selectedProduct =
+                    await context.push<ProductModel>('/products/select');
+                if (selectedProduct != null) {
+                  ref.read(invoiceFormProvider.notifier).addItem(
+                        InvoiceItemModel(
+                          product: selectedProduct,
+                          quantity: 1,
+                          unitPrice: 0.0,
+                        ),
+                      );
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('إضافة بند'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (items.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('لم يتم إضافة أي بنود.'),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              return InvoiceItemRow(
+                key: ValueKey(items[index].product.id),
+                item: items[index],
+                itemNumber: index + 1,
+                onRemove: () => ref
+                    .read(invoiceFormProvider.notifier)
+                    .removeItem(items[index].product.id),
+                onStateChange: (qty, price) {
+                  ref
+                      .read(invoiceFormProvider.notifier)
+                      .updateItem(items[index].product.id, qty, price);
+                },
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class InvoiceItemRow extends ConsumerStatefulWidget {
+  final InvoiceItemModel item;
+  final int itemNumber;
+  final VoidCallback onRemove;
+  final Function(int qty, double price) onStateChange;
+
+  const InvoiceItemRow({
+    super.key,
+    required this.item,
+    required this.itemNumber,
+    required this.onRemove,
+    required this.onStateChange,
+  });
+
+  @override
+  ConsumerState<InvoiceItemRow> createState() => _InvoiceItemRowState();
+}
+
+class _InvoiceItemRowState extends ConsumerState<InvoiceItemRow> {
+  final _qtyController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _totalController = TextEditingController();
+
+  final _qtyFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _totalFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _updateControllersText();
+
+    // --- بداية التعديل: مسح النص عند التركيز ---
+    _qtyFocusNode.addListener(() {
+      if (_qtyFocusNode.hasFocus) {
+        _qtyController.clear();
+      }
+    });
+    _priceFocusNode.addListener(() {
+      if (_priceFocusNode.hasFocus) {
+        _priceController.clear();
+      }
+    });
+    _totalFocusNode.addListener(() {
+      if (_totalFocusNode.hasFocus) {
+        _totalController.clear();
+      }
+    });
+    // --- نهاية التعديل ---
+  }
+
+  @override
+  void didUpdateWidget(covariant InvoiceItemRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item != oldWidget.item) {
+      _updateControllersText();
+    }
+  }
+
+  void _updateControllersText() {
+    if (!_qtyFocusNode.hasFocus) {
+      _qtyController.text = widget.item.quantity.toString();
+    }
+    if (!_priceFocusNode.hasFocus) {
+      _priceController.text = widget.item.unitPrice.toStringAsFixed(2);
+    }
+    if (!_totalFocusNode.hasFocus) {
+      _totalController.text = widget.item.subtotal.toStringAsFixed(2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    _priceController.dispose();
+    _totalController.dispose();
+
+    _qtyFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _totalFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Text('${widget.itemNumber}.',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(widget.item.product.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                IconButton(
+                    onPressed: widget.onRemove,
+                    icon: const Icon(Icons.delete_outline, color: Colors.red)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                    flex: 2,
+                    child: _buildTextField(
+                        _qtyController, 'الكمية', _qtyFocusNode, (val) {
+                      final qty = int.tryParse(val) ?? 0;
+                      final price =
+                          double.tryParse(_priceController.text) ?? 0.0;
+                      widget.onStateChange(qty, price);
+                    })),
+                const SizedBox(width: 8),
+                Expanded(
+                    flex: 3,
+                    child: _buildTextField(
+                        _priceController, 'السعر', _priceFocusNode, (val) {
+                      final price = double.tryParse(val) ?? 0.0;
+                      final qty = int.tryParse(_qtyController.text) ?? 0;
+                      widget.onStateChange(qty, price);
+                    }, isPrice: true)),
+                const SizedBox(width: 8),
+                Expanded(
+                    flex: 3,
+                    child: _buildTextField(
+                        _totalController, 'الإجمالي', _totalFocusNode, (val) {
+                      final total = double.tryParse(val) ?? 0.0;
+                      final quantity = int.tryParse(_qtyController.text) ?? 1;
+                      if (quantity > 0) {
+                        widget.onStateChange(quantity, total / quantity);
+                      }
+                    }, isPrice: true)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label,
+      FocusNode focusNode, ValueChanged<String> onChanged,
+      {bool isPrice = false}) {
+    return TextFormField(
+      controller: controller,
+      focusNode: focusNode,
+      decoration:
+          InputDecoration(labelText: label, prefixText: isPrice ? '\$ ' : null),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      textAlign: TextAlign.center,
+      onChanged: onChanged,
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/invoice_summary_widget.dart ---
+// lib/features/invoices/presentation/widgets/invoice_summary_widget.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
+
+class InvoiceSummaryWidget extends ConsumerWidget {
+  final TextEditingController discountController;
+  final double totalAfterDiscount;
+
+  const InvoiceSummaryWidget({
+    super.key,
+    required this.discountController,
+    required this.totalAfterDiscount,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final invoiceState = ref.watch(invoiceFormProvider);
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('المجموع الفرعي:', style: theme.textTheme.titleMedium),
+                Text(
+                  '\$${invoiceState.subtotal.toStringAsFixed(2)}',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('الخصم:', style: TextStyle(fontSize: 16)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    controller: discountController,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: '0.0',
+                      prefixText: '\$ ',
+                    ),
+                    onChanged: (value) {
+                      // We can directly call the notifier if we pass it, or let the parent handle it
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('المجموع النهائي:', style: theme.textTheme.titleLarge),
+                Text(
+                  '\$${totalAfterDiscount.toStringAsFixed(2)}',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/invoices/presentation/widgets/payment_section_widget.dart ---
+// lib/features/invoices/presentation/widgets/payment_section_widget.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/invoices/data/models/fund_model.dart';
+import 'package:syria_store/features/invoices/presentation/providers/funds_provider.dart';
+import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
+
+class PaymentSectionWidget extends ConsumerWidget {
+  final TextEditingController usdPaymentController;
+  final TextEditingController sypPaymentController;
+  final ValueChanged<FundModel?> onUsdFundChanged;
+  final ValueChanged<FundModel?> onSypFundChanged;
+  final FundModel? selectedUsdFund;
+  final FundModel? selectedSypFund;
+
+  const PaymentSectionWidget({
+    super.key,
+    required this.usdPaymentController,
+    required this.sypPaymentController,
+    required this.onUsdFundChanged,
+    required this.onSypFundChanged,
+    this.selectedUsdFund,
+    this.selectedSypFund,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final invoiceState = ref.watch(invoiceFormProvider);
+    final usdFunds = ref.watch(usdFundsProvider);
+    final sypFunds = ref.watch(sypFundsProvider);
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الدفع', style: theme.textTheme.titleLarge),
+            const Divider(),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              alignment: WrapAlignment.center,
+              children: [
+                ToggleButtons(
+                  isSelected: [
+                    invoiceState.paymentMethod == 'cash',
+                    invoiceState.paymentMethod == 'credit',
+                  ],
+                  onPressed: (index) => ref
+                      .read(invoiceFormProvider.notifier)
+                      .setPaymentMethod(index == 0 ? 'cash' : 'credit'),
+                  borderRadius: BorderRadius.circular(8),
+                  constraints: const BoxConstraints(minHeight: 40.0),
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text('نقدي'),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text('آجل'),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  width: 180,
+                  child: DropdownButtonFormField<String>(
+                    value: invoiceState.deliveryStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'حالة التسليم',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'delivered',
+                        child: Text('تم التسليم'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'pending',
+                        child: Text('قيد التسليم'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        ref
+                            .read(invoiceFormProvider.notifier)
+                            .setDeliveryStatus(val);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'تسجيل دفعة (رعبون أو دفعة كاملة):',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: usdPaymentController,
+                    decoration: const InputDecoration(
+                      labelText: 'المبلغ المدفوع \$',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<FundModel>(
+                    hint: const Text('صندوق الدولار'),
+                    value: selectedUsdFund,
+                    items: usdFunds
+                        .map(
+                          (f) =>
+                              DropdownMenuItem(value: f, child: Text(f.name)),
+                        )
+                        .toList(),
+                    onChanged: onUsdFundChanged,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: sypPaymentController,
+                    decoration: const InputDecoration(
+                      labelText: 'المبلغ المدفوع ل.س',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<FundModel>(
+                    hint: const Text('صندوق السوري'),
+                    value: selectedSypFund,
+                    items: sypFunds
+                        .map(
+                          (f) =>
+                              DropdownMenuItem(value: f, child: Text(f.name)),
+                        )
+                        .toList(),
+                    onChanged: onSypFundChanged,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+

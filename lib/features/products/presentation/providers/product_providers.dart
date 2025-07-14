@@ -16,15 +16,14 @@ final allProductsProvider = FutureProvider.autoDispose<List<ProductModel>>((
   final searchQuery = ref.watch(productSearchQueryProvider);
 
   try {
-    // --- بداية التعديل: تصحيح العلاقة واستخدام البحث المرن ---
-    var query = supabase.from('products').select(
-        '*, contacts:default_contact_id(name)'); // تصحيح طريقة طلب العلاقة
+    var query = supabase
+        .from('products')
+        .select('*, contacts:default_contact_id(name)'); // تصحيح طلب العلاقة
 
     if (searchQuery.isNotEmpty) {
       // استخدام البحث المرن الذي أعجبك
       query = query.or('name.ilike.%$searchQuery%,sku.ilike.%$searchQuery%');
     }
-    // --- نهاية التعديل ---
 
     final response = await query.order('created_at', ascending: false);
     final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(
@@ -37,7 +36,6 @@ final allProductsProvider = FutureProvider.autoDispose<List<ProductModel>>((
   }
 });
 
-// ... باقي الملف يبقى كما هو ...
 final productDetailsProvider = FutureProvider.autoDispose
     .family<ProductModel?, String>((ref, productId) async {
   final supabase = ref.watch(supabaseProvider);
@@ -64,7 +62,6 @@ class ProductController extends StateNotifier<bool> {
   final Ref ref;
   ProductController({required this.ref}) : super(false);
 
-  // ... باقي دوال الكنترولر تبقى كما هي ...
   Future<bool> addProduct({
     required BuildContext context,
     required String name,
