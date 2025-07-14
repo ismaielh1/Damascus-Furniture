@@ -2408,3 +2408,2397 @@ class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
 }
 
 
+--- FILE: lib/features/logs/presentation/pages/logs_page.dart ---
+// lib/features/logs/presentation/pages/logs_page.dart
+import 'package:flutter/material.dart';
+
+class LogsPage extends StatelessWidget {
+  const LogsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('سجل الإجراءات'),
+      ),
+      body: const Center(
+        child: Text('سيتم بناء هذه الصفحة لاحقًا لعرض كل السجلات'),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/data/models/product_model.dart ---
+// lib/features/products/data/models/product_model.dart
+
+class ProductModel {
+  final String id;
+  final String sku;
+  final String name;
+  final String? description;
+  final String unitOfMeasure;
+  final String? defaultContactId; // تم التعديل من defaultSupplierId
+  final String? contactName; // تم التعديل من supplierName
+
+  ProductModel({
+    required this.id,
+    required this.sku,
+    required this.name,
+    this.description,
+    required this.unitOfMeasure,
+    this.defaultContactId,
+    this.contactName,
+  });
+
+  factory ProductModel.fromJson(Map<String, dynamic> json) {
+    return ProductModel(
+      id: json['id'].toString(),
+      sku: json['sku'],
+      name: json['name'],
+      description: json['description'],
+      unitOfMeasure: json['unit_of_measure'],
+      defaultContactId: json['default_contact_id'], // تم التعديل
+      // قراءة اسم جهة الاتصال من العلاقة الجديدة 'contacts'
+      contactName: json['contacts'] != null
+          ? json['contacts']['name']
+          : null, // تم التعديل
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/add_edit_product_page.dart ---
+// lib/features/products/presentation/pages/add_edit_product_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/features/categories/data/models/category_model.dart';
+import 'package:syria_store/features/products/presentation/providers/product_providers.dart';
+import 'package:syria_store/features/products/presentation/widgets/add_edit_form/product_association_form.dart';
+import 'package:syria_store/features/products/presentation/widgets/add_edit_form/product_primary_info_form.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+
+class AddEditProductPage extends ConsumerStatefulWidget {
+  final String? productId;
+  const AddEditProductPage({super.key, this.productId});
+
+  @override
+  ConsumerState<AddEditProductPage> createState() => _AddEditProductPageState();
+}
+
+class _AddEditProductPageState extends ConsumerState<AddEditProductPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _unitController = TextEditingController(text: 'قطعة');
+  
+  Supplier? _selectedSupplier;
+  CategoryModel? _selectedCategory;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _unitController.dispose();
+    super.dispose();
+  }
+
+  void _saveProduct() {
+    if (_formKey.currentState!.validate()) {
+      if(widget.productId == null){
+        // Add new product logic
+        ref.read(productControllerProvider.notifier).addProduct(
+          context: context,
+          name: _nameController.text.trim(),
+          contactId: _selectedSupplier!.id,
+          description: _descriptionController.text.trim(),
+          unitOfMeasure: _unitController.text.trim(),
+        ).then((success) {
+          if (success && mounted) context.pop();
+        });
+      } else {
+        // Edit existing product logic
+        ref.read(productControllerProvider.notifier).updateProduct(
+          context: context,
+          productId: widget.productId!,
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          unitOfMeasure: _unitController.text.trim(),
+        ).then((success) {
+          if (success && mounted) context.pop();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(productControllerProvider);
+    final isEditing = widget.productId != null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? 'تعديل منتج' : 'إضافة منتج جديد للكتالوج'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ProductPrimaryInfoForm(
+                nameController: _nameController,
+                descriptionController: _descriptionController,
+                unitController: _unitController,
+              ),
+              const SizedBox(height: 16),
+              // We hide this section in edit mode for now, as changing category/supplier of an existing product has complex implications
+              if (!isEditing)
+                ProductAssociationForm(
+                  selectedCategory: _selectedCategory,
+                  selectedSupplier: _selectedSupplier,
+                  onCategoryChanged: (category) => setState(() {
+                    _selectedCategory = category;
+                    _selectedSupplier = null; // Reset supplier when category changes
+                  }),
+                  onSupplierChanged: (supplier) => setState(() => _selectedSupplier = supplier),
+                ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: isLoading ? null : _saveProduct,
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                child: isLoading
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                    : Text(isEditing ? 'حفظ التعديلات' : 'حفظ المنتج'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/product_list_page.dart ---
+// lib/features/products/presentation/pages/product_list_page.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/products/presentation/providers/product_providers.dart';
+
+class ProductListPage extends ConsumerStatefulWidget {
+  const ProductListPage({super.key});
+
+  @override
+  ConsumerState<ProductListPage> createState() => _ProductListPageState();
+}
+
+class _ProductListPageState extends ConsumerState<ProductListPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(productSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(allProductsProvider);
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(title: const Text('إدارة المنتجات (الكتالوج)')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.push('/products/new'),
+        child: const Icon(Icons.add),
+        tooltip: 'إضافة منتج جديد',
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ابحث بالاسم أو الرمز (SKU)...',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                ref.read(productSearchQueryProvider.notifier).state = value;
+              },
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(allProductsProvider.future),
+              child: productsAsync.when(
+                data: (products) {
+                  if (products.isEmpty) {
+                    return const Center(
+                      child: Text('لا توجد منتجات. قم بإضافة منتج جديد.'),
+                    );
+                  }
+                  return ListView.builder(
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      final product = products[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: FittedBox(
+                              child: Text(
+                                product.sku,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            product.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          // -- تعديل -- : استخدام contactName
+                          subtitle: Text(
+                            'المورد الافتراضي: ${product.contactName ?? 'غير محدد'}',
+                          ),
+                          trailing: Text(product.unitOfMeasure),
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, s) => Center(child: Text('حدث خطأ: $e')),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/pages/product_selector_page.dart ---
+// lib/features/products/presentation/pages/product_selector_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/products/presentation/providers/product_providers.dart';
+
+class ProductSelectorPage extends ConsumerWidget {
+  const ProductSelectorPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final productsAsync = ref.watch(allProductsProvider);
+    final searchQuery = ref.watch(productSearchQueryProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('اختر منتجًا')),
+      // -- بداية الإضافة --
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/products/new'),
+        label: const Text('إضافة منتج جديد'),
+        icon: const Icon(Icons.add),
+      ),
+      // -- نهاية الإضافة --
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: TextEditingController(text: searchQuery)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: searchQuery.length),
+                ),
+              decoration: InputDecoration(
+                hintText: 'ابحث بالاسم أو الرمز (SKU)...',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (value) {
+                ref.read(productSearchQueryProvider.notifier).state = value;
+              },
+            ),
+          ),
+          Expanded(
+            child: productsAsync.when(
+              data: (products) {
+                if (products.isEmpty) {
+                  return const Center(
+                    child: Text('لا توجد منتجات تطابق البحث.'),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    return ListTile(
+                      leading: CircleAvatar(child: Text(product.sku)),
+                      title: Text(product.name),
+                      subtitle: Text('وحدة القياس: ${product.unitOfMeasure}'),
+                      onTap: () {
+                        // عند اختيار منتج، نرجع إلى الصفحة السابقة مع إرسال المنتج المختار
+                        context.pop(product);
+                      },
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => Center(child: Text('حدث خطأ: $e')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/providers/product_providers.dart ---
+// lib/features/products/presentation/providers/product_providers.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+final productSearchQueryProvider = StateProvider.autoDispose<String>(
+  (ref) => '',
+);
+
+final allProductsProvider = FutureProvider.autoDispose<List<ProductModel>>((
+  ref,
+) async {
+  final supabase = ref.watch(supabaseProvider);
+  final searchQuery = ref.watch(productSearchQueryProvider);
+
+  try {
+    // --- بداية التعديل: تصحيح العلاقة واستخدام البحث المرن ---
+    var query = supabase.from('products').select(
+        '*, contacts:default_contact_id(name)'); // تصحيح طريقة طلب العلاقة
+
+    if (searchQuery.isNotEmpty) {
+      // استخدام البحث المرن الذي أعجبك
+      query = query.or('name.ilike.%$searchQuery%,sku.ilike.%$searchQuery%');
+    }
+    // --- نهاية التعديل ---
+
+    final response = await query.order('created_at', ascending: false);
+    final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(
+      response,
+    );
+    return data.map((item) => ProductModel.fromJson(item)).toList();
+  } catch (e) {
+    debugPrint('Error fetching products: $e');
+    rethrow;
+  }
+});
+
+// ... باقي الملف يبقى كما هو ...
+final productDetailsProvider = FutureProvider.autoDispose
+    .family<ProductModel?, String>((ref, productId) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase
+        .from('products')
+        .select(
+            '*, contacts:default_contact_id(name)') // تصحيح العلاقة هنا أيضًا
+        .eq('id', productId)
+        .single();
+    return ProductModel.fromJson(response);
+  } catch (e) {
+    debugPrint('Error fetching product details: $e');
+    return null;
+  }
+});
+
+final productControllerProvider =
+    StateNotifierProvider.autoDispose<ProductController, bool>((ref) {
+  return ProductController(ref: ref);
+});
+
+class ProductController extends StateNotifier<bool> {
+  final Ref ref;
+  ProductController({required this.ref}) : super(false);
+
+  // ... باقي دوال الكنترولر تبقى كما هي ...
+  Future<bool> addProduct({
+    required BuildContext context,
+    required String name,
+    required String contactId,
+    String? description,
+    String? unitOfMeasure,
+  }) async {
+    state = true;
+    try {
+      await ref.read(supabaseProvider).rpc('create_product_with_sku', params: {
+        'product_name': name,
+        'p_default_contact_id': contactId,
+        'p_description': description,
+        'p_unit_of_measure': unitOfMeasure,
+      });
+      ref.invalidate(allProductsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تمت إضافة المنتج بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل إضافة المنتج: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+
+  Future<bool> updateProduct({
+    required BuildContext context,
+    required String productId,
+    required String name,
+    String? description,
+    String? unitOfMeasure,
+  }) async {
+    state = true;
+    try {
+      await ref.read(supabaseProvider).rpc(
+        'update_product',
+        params: {
+          'p_id': productId,
+          'p_name': name,
+          'p_description': description,
+          'p_unit_of_measure': unitOfMeasure,
+        },
+      );
+      ref.invalidate(allProductsProvider);
+      ref.invalidate(productDetailsProvider(productId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحديث المنتج بنجاح'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل تحديث المنتج: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/widgets/add_edit_form/product_association_form.dart ---
+// lib/features/products/presentation/widgets/add_edit_form/product_association_form.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/categories/data/models/category_model.dart';
+import 'package:syria_store/features/categories/presentation/dialogs/add_edit_category_dialog.dart';
+import 'package:syria_store/features/categories/presentation/providers/category_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/add_supplier_dialog.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/supplier_list_provider.dart';
+
+class ProductAssociationForm extends ConsumerWidget {
+  final CategoryModel? selectedCategory;
+  final Supplier? selectedSupplier;
+  final ValueChanged<CategoryModel?> onCategoryChanged;
+  final ValueChanged<Supplier?> onSupplierChanged;
+
+  const ProductAssociationForm({
+    super.key,
+    required this.selectedCategory,
+    required this.selectedSupplier,
+    required this.onCategoryChanged,
+    required this.onSupplierChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allSuppliersAsync = ref.watch(allSuppliersProvider);
+    final allCategoriesAsync = ref.watch(categoriesProvider);
+
+    return Column(
+      children: [
+        // Dropdown for Categories
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: allCategoriesAsync.when(
+                data: (categories) => DropdownButtonFormField<CategoryModel>(
+                  value: selectedCategory,
+                  hint: const Text('اختر التصنيف'),
+                  decoration: const InputDecoration(labelText: 'التصنيف'),
+                  items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                  onChanged: onCategoryChanged,
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (e, s) => Text('خطأ: $e'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () => showDialog(context: context, builder: (_) => const AddEditCategoryDialog()),
+              tooltip: 'إضافة تصنيف جديد',
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Dropdown for Suppliers
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: allSuppliersAsync.when(
+                data: (suppliers) => DropdownButtonFormField<Supplier>(
+                  value: selectedSupplier,
+                  hint: const Text('اختر المورد الافتراضي'),
+                  decoration: const InputDecoration(labelText: 'المورد (لإنشاء الرمز)'),
+                  items: suppliers.map((s) => DropdownMenuItem(value: Supplier(id: s.id, name: s.name), child: Text(s.name))).toList(),
+                  onChanged: onSupplierChanged,
+                  validator: (value) => value == null ? 'يجب اختيار مورد افتراضي' : null,
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (e, s) => Text('خطأ في جلب الموردين: $e'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => AddSupplierDialog(selectedCategoryId: selectedCategory?.id),
+              ),
+              tooltip: 'إضافة مورد جديد',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/products/presentation/widgets/add_edit_form/product_primary_info_form.dart ---
+// lib/features/products/presentation/widgets/add_edit_form/product_primary_info_form.dart
+import 'package:flutter/material.dart';
+
+class ProductPrimaryInfoForm extends StatelessWidget {
+  final TextEditingController nameController;
+  final TextEditingController descriptionController;
+  final TextEditingController unitController;
+
+  const ProductPrimaryInfoForm({
+    super.key,
+    required this.nameController,
+    required this.descriptionController,
+    required this.unitController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TextFormField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: 'اسم المنتج'),
+          validator: (val) => val == null || val.isEmpty ? 'الحقل مطلوب' : null,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: descriptionController,
+          decoration: const InputDecoration(labelText: 'الوصف (اختياري)'),
+          maxLines: 3,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: unitController,
+          decoration: const InputDecoration(labelText: 'وحدة القياس'),
+          validator: (val) => val == null || val.isEmpty ? 'الحقل مطلوب' : null,
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/reports/data/models/financial_report_model.dart ---
+// lib/features/reports/data/models/financial_report_model.dart
+class SupplierFinancialReportRow {
+  final String supplierId;
+  final String supplierName;
+  final String? supplierCode;
+  final double totalAgreements;
+  final double totalPaid;
+  final double balance;
+
+  SupplierFinancialReportRow({
+    required this.supplierId,
+    required this.supplierName,
+    this.supplierCode,
+    required this.totalAgreements,
+    required this.totalPaid,
+    required this.balance,
+  });
+
+  factory SupplierFinancialReportRow.fromJson(Map<String, dynamic> json) {
+    return SupplierFinancialReportRow(
+      supplierId: json['supplier_id'],
+      supplierName: json['supplier_name'],
+      supplierCode: json['supplier_code'],
+      totalAgreements: (json['total_agreements'] as num? ?? 0).toDouble(),
+      totalPaid: (json['total_paid'] as num? ?? 0).toDouble(),
+      balance: (json['balance'] as num? ?? 0).toDouble(),
+    );
+  }
+}
+
+
+--- FILE: lib/features/reports/presentation/pages/financial_report_page.dart ---
+// lib/features/reports/presentation/pages/financial_report_page.dart
+import 'package:excel/excel.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/core/utils/downloader.dart'
+    if (dart.library.html) 'package:syria_store/core/utils/downloader_web.dart';
+import 'package:syria_store/features/reports/data/models/financial_report_model.dart';
+import 'package:syria_store/features/reports/presentation/providers/report_provider.dart';
+
+class FinancialReportPage extends ConsumerWidget {
+  const FinancialReportPage({super.key});
+
+  Future<void> _exportToExcel(
+    BuildContext context,
+    List<SupplierFinancialReportRow> data,
+  ) async {
+    try {
+      final excel = Excel.createExcel();
+      final Sheet sheetObject = excel['Sheet1'];
+
+      sheetObject.isRTL = true;
+
+      sheetObject.appendRow([
+         TextCellValue('رمز المورد'),
+         TextCellValue('اسم المورد'),
+         TextCellValue('إجمالي الاتفاقيات (له)'),
+         TextCellValue('إجمالي الدفعات (لنا)'),
+         TextCellValue('الرصيد النهائي'),
+      ]);
+
+      for (var row in data) {
+        sheetObject.appendRow([
+          TextCellValue(row.supplierCode ?? 'N/A'),
+          TextCellValue(row.supplierName),
+          DoubleCellValue(row.totalAgreements),
+          DoubleCellValue(row.totalPaid),
+          DoubleCellValue(row.balance),
+        ]);
+      }
+
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        await saveAndLaunchFile(fileBytes, "التقرير المالي للموردين.xlsx");
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('فشل تصدير الملف: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reportAsync = ref.watch(financialReportProvider);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('التقرير المالي للموردين'),
+        actions: [
+          reportAsync.when(
+            data: (data) => data.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: const Icon(Icons.download_for_offline_outlined),
+                    onPressed: () => _exportToExcel(context, data),
+                    tooltip: 'تصدير إلى Excel',
+                  ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(financialReportProvider.future),
+        child: reportAsync.when(
+          data: (reportData) {
+            if (reportData.isEmpty) {
+              return const Center(child: Text('لا توجد بيانات لعرضها.'));
+            }
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: DataTable(
+                      border: TableBorder.all(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      headingRowColor: MaterialStateProperty.all(
+                        theme.primaryColor.withOpacity(0.1),
+                      ),
+                      columns: const [
+                        DataColumn(
+                          label: Text(
+                            'رمز المورد',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'اسم المورد',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'إجمالي له',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'إجمالي لنا',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'الرصيد',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                      rows: reportData.map((row) {
+                        final balanceColor = row.balance > 0
+                            ? Colors.red.shade700
+                            : (row.balance < 0
+                                  ? Colors.green.shade700
+                                  : Colors.black);
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(row.supplierCode ?? 'N/A')),
+                            DataCell(Text(row.supplierName)),
+                            DataCell(
+                              Text(
+                                '\$${row.totalAgreements.toStringAsFixed(2)}',
+                              ),
+                            ),
+                            DataCell(
+                              Text('\$${row.totalPaid.toStringAsFixed(2)}'),
+                            ),
+                            DataCell(
+                              Text(
+                                '\$${row.balance.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: balanceColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('حدث خطأ في جلب التقرير: $e')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/reports/presentation/providers/report_provider.dart ---
+// lib/features/reports/presentation/providers/report_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/reports/data/models/financial_report_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+final financialReportProvider =
+    FutureProvider.autoDispose<List<SupplierFinancialReportRow>>((ref) async {
+      final supabase = ref.watch(supabaseProvider);
+      try {
+        final response = await supabase.rpc(
+          'get_all_suppliers_financial_summary',
+        );
+        final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(
+          response,
+        );
+        return data
+            .map((item) => SupplierFinancialReportRow.fromJson(item))
+            .toList();
+      } catch (e) {
+        print('Error fetching financial report: $e');
+        rethrow;
+      }
+    });
+
+
+--- FILE: lib/features/settings/data/models/exchange_rate_model.dart ---
+// lib/features/settings/data/models/exchange_rate_model.dart
+class ExchangeRateModel {
+  final int id;
+  final DateTime rateTimestamp;
+  final double rateUsdToSyp;
+
+  ExchangeRateModel({
+    required this.id,
+    required this.rateTimestamp,
+    required this.rateUsdToSyp,
+  });
+
+  factory ExchangeRateModel.fromJson(Map<String, dynamic> json) {
+    return ExchangeRateModel(
+      id: json['id'],
+      rateTimestamp: DateTime.parse(json['rate_timestamp']),
+      rateUsdToSyp: (json['rate_usd_to_syp'] as num).toDouble(),
+    );
+  }
+}
+
+
+--- FILE: lib/features/settings/presentation/pages/exchange_rate_history_page.dart ---
+// lib/features/settings/presentation/pages/exchange_rate_history_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/settings/presentation/providers/settings_provider.dart';
+
+class ExchangeRateHistoryPage extends ConsumerWidget {
+  const ExchangeRateHistoryPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(exchangeRateHistoryProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('سجل أسعار الصرف')),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(exchangeRateHistoryProvider.future),
+        child: historyAsync.when(
+          data: (history) {
+            if (history.isEmpty) {
+              return const Center(child: Text('لا يوجد سجل لعرضه.'));
+            }
+            return ListView.builder(
+              itemCount: history.length,
+              itemBuilder: (context, index) {
+                final rate = history[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: ListTile(
+                    leading: const Icon(Icons.watch_later_outlined),
+                    title: Text(
+                      'السعر: ${rate.rateUsdToSyp}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    // -- بداية التعديل --
+                    subtitle: Text(
+                      'الوقت: ${DateFormat('yyyy/MM/dd, hh:mm a', 'en_US').format(rate.rateTimestamp)}',
+                    ),
+                    // -- نهاية التعديل --
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('حدث خطأ في جلب السجل: $e')),
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/settings/presentation/pages/settings_page.dart ---
+// lib/features/settings/presentation/pages/settings_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/app/widgets/app_drawer.dart';
+import 'package:syria_store/features/settings/presentation/widgets/exchange_rate_manager.dart';
+import 'package:syria_store/features/settings/presentation/widgets/general_management_panel.dart';
+
+class SettingsPage extends ConsumerWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        title: const Text('الإعدادات'),
+      ),
+      body: const SingleChildScrollView(
+        padding: EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExchangeRateManager(),
+            SizedBox(height: 40),
+            GeneralManagementPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+--- FILE: lib/features/settings/presentation/providers/settings_provider.dart ---
+// lib/features/settings/presentation/providers/settings_provider.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/settings/data/models/exchange_rate_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
+
+// Provider لجلب آخر سعر صرف مسجل
+final latestExchangeRateProvider =
+    FutureProvider.autoDispose<ExchangeRateModel?>((ref) async {
+      final supabase = ref.watch(supabaseProvider);
+      try {
+        final response = await supabase
+            .from('daily_exchange_rates')
+            .select()
+            .order(
+              'rate_timestamp',
+              ascending: false,
+            ) // الترتيب حسب الوقت الدقيق
+            .limit(1)
+            .single();
+        return ExchangeRateModel.fromJson(response);
+      } catch (e) {
+        print('No exchange rate found: $e');
+        return null;
+      }
+    });
+
+// Provider جديد لجلب كل سجل أسعار الصرف
+final exchangeRateHistoryProvider =
+    FutureProvider.autoDispose<List<ExchangeRateModel>>((ref) async {
+      final supabase = ref.watch(supabaseProvider);
+      final response = await supabase
+          .from('daily_exchange_rates')
+          .select()
+          .order(
+            'rate_timestamp',
+            ascending: false,
+          ); // الترتيب حسب الوقت الدقيق
+      return response.map((item) => ExchangeRateModel.fromJson(item)).toList();
+    });
+
+// Controller لحفظ سعر الصرف
+final settingsControllerProvider =
+    StateNotifierProvider.autoDispose<SettingsController, bool>((ref) {
+      return SettingsController(ref: ref);
+    });
+
+class SettingsController extends StateNotifier<bool> {
+  final Ref _ref;
+  SettingsController({required Ref ref}) : _ref = ref, super(false);
+
+  Future<bool> setTodayRate(
+    BuildContext context, {
+    required double rate,
+  }) async {
+    state = true;
+    try {
+      // لم نعد نستخدم upsert، بل نضيف سجلاً جديداً في كل مرة
+      await _ref.read(supabaseProvider).from('daily_exchange_rates').insert({
+        'rate_usd_to_syp': rate,
+        // سيتم إضافة التاريخ والوقت الحالي تلقائياً من قاعدة البيانات
+      });
+
+      _ref.invalidate(latestExchangeRateProvider);
+      _ref.invalidate(exchangeRateHistoryProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حفظ سعر الصرف بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل حفظ سعر الصرف: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    } finally {
+      state = false;
+    }
+  }
+}
+
+
+--- FILE: lib/features/settings/presentation/widgets/exchange_rate_manager.dart ---
+// lib/features/settings/presentation/widgets/exchange_rate_manager.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:syria_store/features/settings/presentation/providers/settings_provider.dart';
+
+class ExchangeRateManager extends ConsumerStatefulWidget {
+  const ExchangeRateManager({super.key});
+
+  @override
+  ConsumerState<ExchangeRateManager> createState() => _ExchangeRateManagerState();
+}
+
+class _ExchangeRateManagerState extends ConsumerState<ExchangeRateManager> {
+  final _rateController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _rateController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      final rate = double.tryParse(_rateController.text);
+      if (rate == null) return;
+      ref.read(settingsControllerProvider.notifier)
+          .setTodayRate(context, rate: rate)
+          .then((success) {
+        if (success) {
+          _rateController.clear();
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final latestRateAsync = ref.watch(latestExchangeRateProvider);
+    final isLoading = ref.watch(settingsControllerProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('إدارة سعر الصرف', style: theme.textTheme.headlineSmall),
+            IconButton(
+              icon: const Icon(Icons.history_outlined),
+              onPressed: () => context.push('/settings/history'),
+              tooltip: 'عرض سجل الأسعار',
+            ),
+          ],
+        ),
+        const Divider(height: 24),
+        latestRateAsync.when(
+          data: (rate) {
+            if (rate == null) {
+              return Text('لم يتم تسجيل أي سعر صرف حتى الآن.', style: theme.textTheme.titleMedium);
+            }
+            return Card(
+              elevation: 2,
+              child: ListTile(
+                leading: const Icon(Icons.currency_exchange, color: Colors.green),
+                title: Text('آخر سعر صرف مسجل للدولار', style: theme.textTheme.titleMedium),
+                subtitle: Text('في: ${DateFormat('yyyy/MM/dd, hh:mm a', 'en_US').format(rate.rateTimestamp)}'),
+                trailing: Text(
+                  rate.rateUsdToSyp.toString(),
+                  style: theme.textTheme.headlineSmall?.copyWith(color: theme.primaryColor),
+                ),
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Text('خطأ في جلب السعر: $e'),
+        ),
+        const SizedBox(height: 32),
+        Text('إدخال سعر جديد الآن', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 16),
+        Form(
+          key: _formKey,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _rateController,
+                  decoration: const InputDecoration(
+                    labelText: 'سعر صرف الدولار الحالي',
+                    hintText: 'مثال: 14000',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'الحقل مطلوب';
+                    if (double.tryParse(val) == null) return 'الرجاء إدخال رقم صحيح';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed: isLoading ? null : _onSave,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                ),
+                child: isLoading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('حفظ'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/settings/presentation/widgets/general_management_panel.dart ---
+// lib/features/settings/presentation/widgets/general_management_panel.dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+class GeneralManagementPanel extends StatelessWidget {
+  const GeneralManagementPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('الإدارة العامة', style: theme.textTheme.headlineSmall),
+        const Divider(height: 24),
+        Card(
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.storefront_outlined),
+                title: const Text('إدارة الفروع'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () => context.push('/branches'),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.category_outlined),
+                title: const Text('إدارة التصنيفات'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () => context.push('/categories'),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('إدارة الموظفين'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () => context.push('/employees'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/data/models/agreement_item_model.dart ---
+// lib/features/suppliers/data/models/agreement_item_model.dart
+import 'package:equatable/equatable.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+
+class AgreementItem extends Equatable {
+  final int id;
+  final String agreementId;
+  final ProductModel? product;
+  final int totalQuantity;
+  final double unitPrice;
+  final int receivedQuantitySoFar;
+  final DateTime expectedDeliveryDate;
+
+  const AgreementItem({
+    required this.id,
+    required this.agreementId,
+    required this.product,
+    required this.totalQuantity,
+    required this.unitPrice,
+    required this.receivedQuantitySoFar,
+    required this.expectedDeliveryDate,
+  });
+
+  double get subtotal => totalQuantity * unitPrice;
+
+  @override
+  List<Object?> get props => [
+        id,
+        product,
+        totalQuantity,
+        unitPrice,
+        receivedQuantitySoFar,
+      ];
+
+  factory AgreementItem.fromJson(Map<String, dynamic> json) {
+    return AgreementItem(
+      id: json['id'],
+      agreementId: json['agreement_id'],
+      product: json['products'] != null
+          ? ProductModel.fromJson(json['products'])
+          : null,
+      totalQuantity: (json['total_quantity'] as num?)?.toInt() ?? 0,
+      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
+      receivedQuantitySoFar:
+          (json['received_quantity_so_far'] as num?)?.toInt() ?? 0,
+      expectedDeliveryDate: DateTime.parse(json['expected_delivery_date']),
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/data/models/contact_model.dart ---
+import 'package:equatable/equatable.dart';
+
+class ContactModel extends Equatable {
+  final String id;
+  final String name;
+  final String? code;
+  final String? phoneNumber;
+  final String? address;
+  final bool isSupplier;
+  final bool isCustomer;
+  final String? categoryName;
+
+  const ContactModel({
+    required this.id,
+    required this.name,
+    this.code,
+    this.phoneNumber,
+    this.address,
+    required this.isSupplier,
+    required this.isCustomer,
+    this.categoryName,
+  });
+
+  factory ContactModel.fromJson(Map<String, dynamic> json) {
+    String? category;
+    if (json['supplier_category_link'] != null &&
+        (json['supplier_category_link'] as List).isNotEmpty) {
+      final linkData = (json['supplier_category_link'] as List).first;
+      if (linkData['supplier_categories'] != null &&
+          linkData['supplier_categories'] is Map) {
+        final categoryData =
+            linkData['supplier_categories'] as Map<String, dynamic>;
+        if (categoryData['name'] != null) {
+          category = categoryData['name'].toString();
+        }
+      }
+    }
+
+    return ContactModel(
+      id: json['id'].toString(),
+      name: json['name']?.toString() ?? 'اسم غير متوفر',
+      code: json['code']?.toString(),
+      phoneNumber: json['phone_number']?.toString(),
+      address: json['address']?.toString(),
+      isSupplier: json['is_supplier'] ?? false,
+      isCustomer: json['is_customer'] ?? false,
+      categoryName: category,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id];
+}
+
+
+--- FILE: lib/features/suppliers/data/models/supplier_agreement_model.dart ---
+import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
+
+class SupplierAgreement {
+  final String id;
+  final String? contactId;
+  final String? contactName;
+  final String agreementDetails;
+  final double totalAmount;
+  final DateTime agreement_date;
+  final DateTime? expectedDeliveryDate;
+  final String status;
+  final double? down_payment;
+  final List<String> documentImagePaths;
+
+  SupplierAgreement({
+    required this.id,
+    this.contactId,
+    this.contactName,
+    required this.agreementDetails,
+    required this.totalAmount,
+    required this.agreement_date,
+    this.expectedDeliveryDate,
+    required this.status,
+    this.down_payment,
+    required this.documentImagePaths,
+  });
+
+  factory SupplierAgreement.fromJson(Map<String, dynamic> json) {
+    return SupplierAgreement(
+      id: json['id'] ?? '',
+      // Ensure it reads from 'contacts' object
+      contactId: json['contacts'] != null
+          ? json['contacts']['id']
+          : json['contact_id'],
+      contactName:
+          json['contacts'] != null ? json['contacts']['name'] : 'مورد غير محدد',
+      agreementDetails: json['notes'] ?? '', // DB column is 'notes'
+      totalAmount:
+          double.tryParse(json['total_amount']?.toString() ?? '0.0') ?? 0.0,
+      agreement_date: DateTime.parse(json['agreement_date']),
+      expectedDeliveryDate: json['expected_delivery_date'] != null
+          ? DateTime.tryParse(json['expected_delivery_date'])
+          : null,
+      status: json['status'] ?? 'غير معروف',
+      down_payment: json['down_payment'] != null
+          ? double.tryParse(json['down_payment'].toString())
+          : null,
+      documentImagePaths: json['document_image_urls'] != null
+          ? List<String>.from(json['document_image_urls'])
+          : [],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/data/models/supplier_financials_model.dart ---
+// lib/features/suppliers/data/models/supplier_financials_model.dart
+import 'package:equatable/equatable.dart';
+
+// نموذج للملخص المالي
+class SupplierFinancialSummary {
+  final double totalAgreements;
+  final double totalPaid;
+  final double balance;
+
+  SupplierFinancialSummary({
+    required this.totalAgreements,
+    required this.totalPaid,
+    required this.balance,
+  });
+
+  factory SupplierFinancialSummary.fromJson(Map<String, dynamic> json) {
+    return SupplierFinancialSummary(
+      totalAgreements: (json['total_agreements'] as num?)?.toDouble() ?? 0.0,
+      totalPaid: (json['total_paid'] as num?)?.toDouble() ?? 0.0,
+      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+// نموذج لسجل الدفعات
+class PaymentModel extends Equatable {
+  final int id; // -- تمت الإضافة --
+  final double amount;
+  final DateTime paymentDate;
+  final String agreementId;
+  final String? notes;
+
+  const PaymentModel({
+    required this.id, // -- تمت الإضافة --
+    required this.amount,
+    required this.paymentDate,
+    required this.agreementId,
+    this.notes,
+  });
+
+  factory PaymentModel.fromJson(Map<String, dynamic> json) {
+    return PaymentModel(
+      id: json['id'], // -- تمت الإضافة --
+      amount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
+      paymentDate: DateTime.parse(json['payment_date']),
+      agreementId: json['agreement_id'].toString(),
+      notes: json['notes'],
+    );
+  }
+  
+  @override
+  List<Object?> get props => [id];
+}
+
+// نموذج جديد لسجل الاستلامات
+class ReceiptLogModel {
+  final String productName;
+  final int receivedQuantity;
+  final DateTime receiptDate;
+  final String? notes;
+
+  ReceiptLogModel({
+    required this.productName,
+    required this.receivedQuantity,
+    required this.receiptDate,
+    this.notes,
+  });
+
+  factory ReceiptLogModel.fromJson(Map<String, dynamic> json) {
+    return ReceiptLogModel(
+      productName: json['product_name'] ?? 'منتج غير محدد',
+      receivedQuantity: (json['received_quantity'] as num?)?.toInt() ?? 0,
+      receiptDate: DateTime.parse(json['receipt_date']),
+      notes: json['notes'],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/add_agreement_item_dialog.dart ---
+// lib/features/suppliers/presentation/dialogs/add_agreement_item_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+
+class AddAgreementItemDialog extends ConsumerStatefulWidget {
+  final ProductModel product;
+
+  const AddAgreementItemDialog({
+    super.key,
+    required this.product,
+  });
+
+  @override
+  ConsumerState<AddAgreementItemDialog> createState() =>
+      _AddAgreementItemDialogState();
+}
+
+class _AddAgreementItemDialogState
+    extends ConsumerState<AddAgreementItemDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _quantityController = TextEditingController();
+  final _priceController = TextEditingController();
+  DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now().add(const Duration(days: 7));
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate!,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (pickedDate != null) {
+      setState(() => _selectedDate = pickedDate);
+    }
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      // تم تعديل إنشاء الكائن ليتوافق مع الموديل الصحيح
+      final newItem = AgreementItem(
+        id: 0, // ID مؤقت سيتم تجاهله
+        agreementId: '', // ID مؤقت سيتم تجاهله
+        product: widget.product,
+        totalQuantity: int.parse(_quantityController.text.trim()),
+        unitPrice: double.parse(_priceController.text.trim()),
+        expectedDeliveryDate: _selectedDate!,
+        receivedQuantitySoFar: 0,
+      );
+      ref.read(agreementFormProvider.notifier).addItem(newItem);
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('إضافة "${widget.product.name}" للاتفاقية'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _quantityController,
+                decoration: InputDecoration(
+                  labelText: 'الكمية (${widget.product.unitOfMeasure})',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (val) =>
+                    (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _priceController,
+                decoration: const InputDecoration(
+                  labelText: 'سعر الوحدة',
+                  suffixText: '\$',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (val) =>
+                    (val == null || val.isEmpty) ? 'الحقل مطلوب' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                readOnly: true,
+                controller: TextEditingController(
+                  text: _selectedDate == null
+                      ? ''
+                      : DateFormat('yyyy/MM/dd').format(_selectedDate!),
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'تاريخ تسليم البند',
+                ),
+                onTap: _pickDate,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(onPressed: _onSave, child: const Text('إضافة')),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/add_payment_dialog.dart ---
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/add_supplier_dialog.dart ---
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+
+class AddSupplierDialog extends ConsumerStatefulWidget {
+  final int? selectedCategoryId;
+  const AddSupplierDialog({super.key, this.selectedCategoryId});
+
+  @override
+  ConsumerState<AddSupplierDialog> createState() => _AddSupplierDialogState();
+}
+
+class _AddSupplierDialogState extends ConsumerState<AddSupplierDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final phoneController = TextEditingController();
+  final addressController = TextEditingController();
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (widget.selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء اختيار تصنيف للمورد أولاً'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (_formKey.currentState!.validate()) {
+      ref.read(addSupplierControllerProvider.notifier).addSupplier(
+        context: context,
+        name: nameController.text.trim(),
+        phone: phoneController.text.trim(),
+        address: addressController.text.trim(),
+        categoryId: widget.selectedCategoryId!,
+      ).then((newSupplier) {
+        if (newSupplier != null && mounted) {
+          Navigator.of(context).pop();
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = ref.watch(addSupplierControllerProvider);
+    return AlertDialog(
+      title: const Text('إضافة مورد جديد'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم المورد'), validator: (val) => val == null || val.isEmpty ? 'الحقل مطلوب' : null),
+            Directionality(textDirection: TextDirection.ltr, child: TextFormField(controller: phoneController, decoration: const InputDecoration(labelText: 'رقم الهاتف'), keyboardType: TextInputType.phone, textAlign: TextAlign.left)),
+            TextFormField(controller: addressController, decoration: const InputDecoration(labelText: 'العنوان')),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('إلغاء')),
+        ElevatedButton(
+          onPressed: isLoading ? null : _onSave,
+          child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/edit_agreement_item_dialog.dart ---
+// lib/features/suppliers/presentation/dialogs/edit_agreement_item_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/agreement_item_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_details_provider.dart';
+
+class EditAgreementItemDialog extends ConsumerStatefulWidget {
+  final AgreementItem item;
+
+  const EditAgreementItemDialog({super.key, required this.item});
+
+  @override
+  ConsumerState<EditAgreementItemDialog> createState() =>
+      _EditAgreementItemDialogState();
+}
+
+class _EditAgreementItemDialogState
+    extends ConsumerState<EditAgreementItemDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _quantityController;
+  late TextEditingController _priceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityController = TextEditingController(
+      text: widget.item.totalQuantity.toString(),
+    );
+    _priceController = TextEditingController(
+      text: widget.item.unitPrice.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      ref
+          .read(updateAgreementStatusControllerProvider.notifier)
+          .updateAgreementItem(
+            context: context,
+            itemId: widget.item.id,
+            agreementId: widget.item.agreementId, // الآن هذا الحقل موجود
+            newQuantity: int.parse(_quantityController.text),
+            newPrice: double.parse(_priceController.text),
+          )
+          .then((success) {
+            if (success && mounted) Navigator.of(context).pop();
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSaving = ref.watch(updateAgreementStatusControllerProvider);
+    return AlertDialog(
+      title: Text('تعديل بند: ${widget.item.product?.name ?? ""}'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _quantityController,
+              decoration: const InputDecoration(labelText: 'الكمية الإجمالية'),
+              keyboardType: TextInputType.number,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'الحقل مطلوب';
+                final quantity = int.tryParse(val);
+                if (quantity == null) return 'أدخل رقماً صحيحاً';
+                if (quantity < widget.item.receivedQuantitySoFar)
+                  return 'لا يمكن أن تكون الكمية أقل من المستلم';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _priceController,
+              decoration: const InputDecoration(
+                labelText: 'سعر الوحدة',
+                prefixText: '\$ ',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'الحقل مطلوب';
+                if (double.tryParse(val) == null) return 'أدخل سعراً صحيحاً';
+                return null;
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: isSaving ? null : _onSave,
+          child: isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('حفظ التعديل'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/edit_payment_dialog.dart ---
+// lib/features/suppliers/presentation/dialogs/edit_payment_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syria_store/features/suppliers/data/models/supplier_financials_model.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_details_provider.dart';
+
+class EditPaymentDialog extends ConsumerStatefulWidget {
+  final PaymentModel payment;
+  final String agreementId;
+
+  const EditPaymentDialog({
+    super.key,
+    required this.payment,
+    required this.agreementId,
+  });
+
+  @override
+  ConsumerState<EditPaymentDialog> createState() => _EditPaymentDialogState();
+}
+
+class _EditPaymentDialogState extends ConsumerState<EditPaymentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _amountController;
+  late TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(
+      text: widget.payment.amount.toString(),
+    );
+    _notesController = TextEditingController(text: widget.payment.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _onSave() {
+    if (_formKey.currentState!.validate()) {
+      ref
+          .read(updateAgreementStatusControllerProvider.notifier)
+          .updatePayment(
+            context: context,
+            paymentId: widget.payment.id,
+            agreementId: widget.agreementId,
+            newAmount: double.parse(_amountController.text),
+            newNotes: _notesController.text.trim(),
+          )
+          .then((success) {
+            if (success && mounted) Navigator.of(context).pop();
+          });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSaving = ref.watch(updateAgreementStatusControllerProvider);
+    return AlertDialog(
+      title: const Text('تعديل الدفعة'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _amountController,
+              decoration: const InputDecoration(
+                labelText: 'مبلغ الدفعة',
+                prefixText: '\$ ',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'الحقل مطلوب';
+                if (double.tryParse(val) == null)
+                  return 'الرجاء إدخال رقم صحيح';
+                if (double.tryParse(val)! <= 0)
+                  return 'يجب أن يكون المبلغ أكبر من صفر';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _notesController,
+              decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: isSaving ? null : _onSave,
+          child: isSaving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('حفظ التعديل'),
+        ),
+      ],
+    );
+  }
+}
+
+
+--- FILE: lib/features/suppliers/presentation/dialogs/update_received_quantity_dialog.dart ---
+
+
+--- FILE: lib/features/suppliers/presentation/pages/add_agreement_page.dart ---
+// lib/features/suppliers/presentation/pages/add_agreement_page.dart
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:syria_store/features/categories/data/models/category_model.dart';
+import 'package:syria_store/features/products/data/models/product_model.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/add_agreement_item_dialog.dart';
+import 'package:syria_store/features/suppliers/presentation/dialogs/add_supplier_dialog.dart';
+import 'package:syria_store/features/suppliers/presentation/providers/agreement_form_provider.dart';
+
+final pickedImagesProvider = StateProvider.autoDispose<List<XFile>>(
+  (ref) => [],
+);
+
+class AddAgreementPage extends ConsumerStatefulWidget {
+  const AddAgreementPage({super.key});
+  @override
+  ConsumerState<AddAgreementPage> createState() => _AddAgreementPageState();
+}
+
+class _AddAgreementPageState extends ConsumerState<AddAgreementPage> {
+  final _formKey = GlobalKey<FormState>();
+  Supplier? _selectedSupplier;
+  final _notesController = TextEditingController();
+  final _downPaymentController = TextEditingController();
+  @override
+  void dispose() {
+    _notesController.dispose();
+    _downPaymentController.dispose();
+    Future.microtask(() {
+      ref.invalidate(agreementFormProvider);
+      ref.invalidate(pickedImagesProvider);
+    });
+    super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
+    final newImages = await picker.pickMultiImage(imageQuality: 70);
+    if (newImages.isNotEmpty) {
+      ref
+          .read(pickedImagesProvider.notifier)
+          .update((state) => [...state, ...newImages]);
+    }
+  }
+
+  void _showAddSupplierDialog() {
+    final selectedCategory = ref.read(selectedCategoryProvider);
+    if (selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار تصنيف أولاً'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (_) =>
+          AddSupplierDialog(selectedCategoryId: selectedCategory.id),
+    );
+  }
+
+  Future<void> _selectAndAddItem() async {
+    final selectedProduct = await context.push<ProductModel>(
+      '/products/select',
+    );
+    if (selectedProduct != null && mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => AddAgreementItemDialog(product: selectedProduct),
+      );
+    }
+  }
+
+  void _submitAgreement() {
+    if (_formKey.currentState!.validate() &&
+        _selectedSupplier != null &&
+        ref.read(agreementFormProvider).isNotEmpty) {
+      ref
+          .read(agreementControllerProvider.notifier)
+          .createFullAgreement(
+            context: context,
+            contactId: _selectedSupplier!.id, // تم التغيير من supplierId
+            notes: _notesController.text.trim(),
+            items: ref.read(agreementFormProvider),
+            downPayment:
+                double.tryParse(_downPaymentController.text.trim()) ?? 0,
+            images: ref.read(pickedImagesProvider),
+          )
+          .then((success) {
+            if (success && mounted) {
+              context.pop();
+            }
+          });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'الرجاء التأكد من اختيار مورد وإضافة بند واحد على الأقل.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = ref.watch(agreementFormProvider);
+    final pickedImages = ref.watch(pickedImagesProvider);
+    final grandTotal = ref.watch(agreementFormProvider.notifier).grandTotal;
+    final isSaving = ref.watch(agreementControllerProvider);
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('إنشاء اتفاقية توريد')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'معلومات الاتفاقية الأساسية',
+                style: theme.textTheme.titleLarge,
+              ),
+              const Divider(),
+              const SizedBox(height: 8),
+
+              Consumer(
+                builder: (context, ref, child) {
+                  final categoriesAsync = ref.watch(supplierCategoriesProvider);
+                  return categoriesAsync.when(
+                    data: (categories) =>
+                        DropdownButtonFormField<CategoryModel>(
+                          hint: const Text('اختر تصنيف المورد'),
+                          decoration: const InputDecoration(
+                            labelText: 'التصنيف',
+                          ),
+                          value: ref.watch(selectedCategoryProvider),
+                          items: categories
+                              .map(
+                                (c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (category) {
+                            ref.read(selectedCategoryProvider.notifier).state =
+                                category;
+                            setState(() => _selectedSupplier = null);
+                          },
+                          validator: (value) =>
+                              value == null ? 'الرجاء اختيار تصنيف' : null,
+                        ),
+                    loading: () => const Text("جاري تحميل التصنيفات..."),
+                    error: (err, stack) => Text('خطأ: $err'),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final suppliersAsync = ref.watch(
+                          suppliersByCategoryProvider,
+                        );
+                        final selectedCategory = ref.watch(
+                          selectedCategoryProvider,
+                        );
+                        return suppliersAsync.when(
+                          data: (suppliers) {
+                            final isSelectedSupplierInList = suppliers.any(
+                              (s) => s.id == _selectedSupplier?.id,
+                            );
+                            final currentValue = isSelectedSupplierInList
+                                ? _selectedSupplier
+                                : null;
+
+                            return DropdownButtonFormField<Supplier>(
+                              value: currentValue,
+                              hint: const Text('اختر المورد'),
+                              decoration: InputDecoration(
+                                labelText: 'المورد',
+                                enabled: selectedCategory != null,
+                              ),
+                              items: suppliers
+                                  .map(
+                                    (s) => DropdownMenuItem(
+                                      value: s,
+                                      child: Text(s.name),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (supplier) =>
+                                  setState(() => _selectedSupplier = supplier),
+                              validator: (value) =>
+                                  (selectedCategory != null && value == null)
+                                  ? 'الرجاء اختيار مورد'
+                                  : null,
+                            );
+                          },
+                          loading: () => const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0),
+                            child: Center(child: LinearProgressIndicator()),
+                          ),
+                          error: (err, stack) => Text('خطأ: $err'),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    icon: const Icon(Icons.add),
+                    onPressed: _showAddSupplierDialog,
+                    tooltip: 'إضافة مورد جديد',
+                    style: IconButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظات الاتفاقية',
+                ),
+                maxLines: 4,
+              ),
+
+              const Divider(height: 32),
+              Text('المستندات والصور', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+
+              if (pickedImages.isNotEmpty)
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: pickedImages.length,
+                    itemBuilder: (context, index) {
+                      final imageFile = pickedImages[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: kIsWeb
+                                  ? Image.network(
+                                      imageFile.path,
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Image.file(
+                                      File(imageFile.path),
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.black.withOpacity(0.6),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  onPressed: () {
+                                    ref
+                                        .read(pickedImagesProvider.notifier)
+                                        .update((state) {
+                                          final newList = List.of(state);
+                                          newList.removeAt(index);
+                                          return newList;
+                                        });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _pickImages,
+                icon: const Icon(Icons.attach_file),
+                label: const Text('إرفاق مستندات أو صور'),
+              ),
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('بنود الاتفاقية', style: theme.textTheme.titleLarge),
+                  FilledButton.icon(
+                    onPressed: _selectAndAddItem,
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('إضافة بند'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (items.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text('لم يتم إضافة أي بنود بعد.'),
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text(item.product?.name ?? 'منتج غير معرف'),
+                        subtitle: Text(
+                          'الكمية: ${item.totalQuantity} × السعر: \$${item.unitPrice.toStringAsFixed(2)}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '\$${item.subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Colors.red.shade700,
+                              ),
+                              onPressed: () => ref
+                                  .read(agreementFormProvider.notifier)
+                                  .removeItem(item.id.toString()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              const SizedBox(height: 24),
+              const Divider(height: 32),
+
+              Text('الملخص المالي', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 8),
+
+              TextFormField(
+                controller: _downPaymentController,
+                decoration: const InputDecoration(
+                  labelText: 'الدفعة المقدمة (اختياري)',
+                  prefixText: '\$ ',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: Text(
+                  'المجموع الإجمالي للبنود',
+                  style: theme.textTheme.titleMedium,
+                ),
+                trailing: Text(
+                  '\$${grandTotal.toStringAsFixed(2)}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: isSaving ? null : _submitAgreement,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    padding: const EdgeInsets.all(16),
+                  ),
+                  child: isSaving
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text('حفظ الاتفاقية'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+

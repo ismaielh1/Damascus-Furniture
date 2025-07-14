@@ -1,3 +1,4 @@
+// lib/features/suppliers/presentation/providers/supplier_list_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
 import 'package:syria_store/features/suppliers/presentation/providers/agreement_list_provider.dart';
@@ -17,11 +18,14 @@ final allSuppliersProvider =
         )
         .eq('is_supplier', true);
 
+    // --- بداية التعديل: تطبيق البحث المرن هنا أيضاً ---
     if (searchQuery.isNotEmpty) {
       query = query.or(
-        'name.ilike.%$searchQuery%,code.ilike.%$searchQuery%,phone_number.ilike.%$searchQuery%,address.ilike.%$searchQuery%',
+        'name.ilike.%$searchQuery%,code.ilike.%$searchQuery%,phone_number.ilike.%$searchQuery%',
       );
     }
+    // --- نهاية التعديل ---
+
     final response = await query.order('created_at', ascending: false);
     final List<Map<String, dynamic>> data =
         List<Map<String, dynamic>>.from(response);

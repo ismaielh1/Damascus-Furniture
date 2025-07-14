@@ -45,7 +45,8 @@ class InvoiceFormState {
     String? deliveryStatus,
   }) {
     return InvoiceFormState(
-      selectedCustomer: clearCustomer ? null : selectedCustomer ?? this.selectedCustomer,
+      selectedCustomer:
+          clearCustomer ? null : selectedCustomer ?? this.selectedCustomer,
       items: items ?? this.items,
       discount: discount ?? this.discount,
       paymentMethod: paymentMethod ?? this.paymentMethod,
@@ -59,7 +60,8 @@ class InvoiceFormState {
 }
 
 final invoiceFormProvider =
-    StateNotifierProvider.autoDispose<InvoiceFormNotifier, InvoiceFormState>((ref) {
+    StateNotifierProvider.autoDispose<InvoiceFormNotifier, InvoiceFormState>(
+        (ref) {
   return InvoiceFormNotifier();
 });
 
@@ -69,17 +71,23 @@ class InvoiceFormNotifier extends StateNotifier<InvoiceFormState> {
   void setInvoiceDate(DateTime date) {
     state = state.copyWith(invoiceDate: date);
   }
+
   void setDeliveryStatus(String status) {
     state = state.copyWith(deliveryStatus: status);
   }
+
   void setCustomer(ContactModel? customer) {
-    state = state.copyWith(selectedCustomer: customer, clearCustomer: customer == null);
+    state = state.copyWith(
+        selectedCustomer: customer, clearCustomer: customer == null);
   }
+
   void setManualInvoiceNumber(String? number) {
     state = state.copyWith(manualInvoiceNumber: number);
   }
+
   void addItem(InvoiceItemModel newItem) {
-    final existingIndex = state.items.indexWhere((item) => item.product.id == newItem.product.id);
+    final existingIndex =
+        state.items.indexWhere((item) => item.product.id == newItem.product.id);
     if (existingIndex != -1) {
       final updatedItems = List<InvoiceItemModel>.from(state.items);
       updatedItems[existingIndex].quantity += newItem.quantity;
@@ -88,9 +96,13 @@ class InvoiceFormNotifier extends StateNotifier<InvoiceFormState> {
       state = state.copyWith(items: [...state.items, newItem]);
     }
   }
+
   void removeItem(String productId) {
-    state = state.copyWith(items: state.items.where((item) => item.product.id != productId).toList());
+    state = state.copyWith(
+        items:
+            state.items.where((item) => item.product.id != productId).toList());
   }
+
   void updateItemQuantity(String productId, int newQuantity) {
     state = state.copyWith(
         items: state.items.map((item) {
@@ -100,6 +112,7 @@ class InvoiceFormNotifier extends StateNotifier<InvoiceFormState> {
       return item;
     }).toList());
   }
+
   void updateItemPrice(String productId, double newPrice) {
     state = state.copyWith(
         items: state.items.map((item) {
@@ -109,21 +122,44 @@ class InvoiceFormNotifier extends StateNotifier<InvoiceFormState> {
       return item;
     }).toList());
   }
+
+  // --- بداية الإضافة: الدالة الجديدة التي لا تحذف الدوال القديمة ---
+  void updateItem(String productId, int newQuantity, double newPrice) {
+    final updatedItems = state.items.map((item) {
+      if (item.product.id == productId) {
+        // نُنشئ نسخة جديدة من العنصر بالقيم المحدثة لضمان تحديث الواجهة بشكل صحيح
+        return InvoiceItemModel(
+          product: item.product,
+          quantity: newQuantity >= 0 ? newQuantity : 0,
+          unitPrice: newPrice,
+        );
+      }
+      return item;
+    }).toList();
+    state = state.copyWith(items: updatedItems);
+  }
+  // --- نهاية الإضافة ---
+
   void setDiscount(double discount) {
     state = state.copyWith(discount: discount);
   }
+
   void setPaymentMethod(String method) {
     state = state.copyWith(paymentMethod: method);
   }
+
   void setNotes(String notes) {
     state = state.copyWith(notes: notes);
   }
+
   void addPayment(PaymentDetailModel payment) {
     state = state.copyWith(payments: [...state.payments, payment]);
   }
+
   void clearPayments() {
     state = state.copyWith(payments: []);
   }
+
   void clearForm() {
     state = InvoiceFormState();
   }
@@ -181,16 +217,17 @@ class InvoiceController extends StateNotifier<bool> {
       });
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم حفظ الفاتورة بنجاح'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('تم حفظ الفاتورة بنجاح'),
+            backgroundColor: Colors.green));
       }
       _ref.read(invoiceFormProvider.notifier).clearForm();
       return true;
-
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل حفظ الفاتورة: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('فشل حفظ الفاتورة: $e'),
+            backgroundColor: Colors.red));
       }
       return false;
     } finally {

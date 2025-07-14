@@ -23,13 +23,10 @@ class InvoiceItemsSectionWidget extends ConsumerWidget {
             Text('بنود الفاتورة', style: theme.textTheme.titleLarge),
             FilledButton.icon(
               onPressed: () async {
-                final selectedProduct = await context.push<ProductModel>(
-                  '/products/select',
-                );
+                final selectedProduct =
+                    await context.push<ProductModel>('/products/select');
                 if (selectedProduct != null) {
-                  ref
-                      .read(invoiceFormProvider.notifier)
-                      .addItem(
+                  ref.read(invoiceFormProvider.notifier).addItem(
                         InvoiceItemModel(
                           product: selectedProduct,
                           quantity: 1,
@@ -64,12 +61,11 @@ class InvoiceItemsSectionWidget extends ConsumerWidget {
                 onRemove: () => ref
                     .read(invoiceFormProvider.notifier)
                     .removeItem(items[index].product.id),
-                onQuantityChanged: (qty) => ref
-                    .read(invoiceFormProvider.notifier)
-                    .updateItemQuantity(items[index].product.id, qty),
-                onPriceChanged: (price) => ref
-                    .read(invoiceFormProvider.notifier)
-                    .updateItemPrice(items[index].product.id, price),
+                onStateChange: (qty, price) {
+                  ref
+                      .read(invoiceFormProvider.notifier)
+                      .updateItem(items[index].product.id, qty, price);
+                },
               );
             },
           ),
@@ -78,161 +74,162 @@ class InvoiceItemsSectionWidget extends ConsumerWidget {
   }
 }
 
-// This sub-widget can stay here or be in its own file. Keeping it here is fine.
-class InvoiceItemRow extends StatefulWidget {
+class InvoiceItemRow extends ConsumerStatefulWidget {
   final InvoiceItemModel item;
   final int itemNumber;
   final VoidCallback onRemove;
-  final ValueChanged<int> onQuantityChanged;
-  final ValueChanged<double> onPriceChanged;
+  final Function(int qty, double price) onStateChange;
 
   const InvoiceItemRow({
     super.key,
     required this.item,
     required this.itemNumber,
     required this.onRemove,
-    required this.onQuantityChanged,
-    required this.onPriceChanged,
+    required this.onStateChange,
   });
+
   @override
-  State<InvoiceItemRow> createState() => _InvoiceItemRowState();
+  ConsumerState<InvoiceItemRow> createState() => _InvoiceItemRowState();
 }
 
-class _InvoiceItemRowState extends State<InvoiceItemRow> {
-  late TextEditingController _qtyController;
-  late TextEditingController _priceController;
+class _InvoiceItemRowState extends ConsumerState<InvoiceItemRow> {
+  final _qtyController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _totalController = TextEditingController();
+
+  final _qtyFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _totalFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _qtyController = TextEditingController(
-      text: widget.item.quantity == 0 ? '' : widget.item.quantity.toString(),
-    );
-    _priceController = TextEditingController(
-      text: widget.item.unitPrice == 0.0
-          ? ''
-          : widget.item.unitPrice.toStringAsFixed(2),
-    );
+    _updateControllersText();
+
+    // --- بداية التعديل: مسح النص عند التركيز ---
+    _qtyFocusNode.addListener(() {
+      if (_qtyFocusNode.hasFocus) {
+        _qtyController.clear();
+      }
+    });
+    _priceFocusNode.addListener(() {
+      if (_priceFocusNode.hasFocus) {
+        _priceController.clear();
+      }
+    });
+    _totalFocusNode.addListener(() {
+      if (_totalFocusNode.hasFocus) {
+        _totalController.clear();
+      }
+    });
+    // --- نهاية التعديل ---
+  }
+
+  @override
+  void didUpdateWidget(covariant InvoiceItemRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item != oldWidget.item) {
+      _updateControllersText();
+    }
+  }
+
+  void _updateControllersText() {
+    if (!_qtyFocusNode.hasFocus) {
+      _qtyController.text = widget.item.quantity.toString();
+    }
+    if (!_priceFocusNode.hasFocus) {
+      _priceController.text = widget.item.unitPrice.toStringAsFixed(2);
+    }
+    if (!_totalFocusNode.hasFocus) {
+      _totalController.text = widget.item.subtotal.toStringAsFixed(2);
+    }
   }
 
   @override
   void dispose() {
     _qtyController.dispose();
     _priceController.dispose();
+    _totalController.dispose();
+
+    _qtyFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _totalFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final currentQty = widget.item.quantity == 0
-            ? ''
-            : widget.item.quantity.toString();
-        if (_qtyController.text != currentQty) {
-          _qtyController.text = currentQty;
-        }
-
-        final currentPrice = widget.item.unitPrice == 0.0
-            ? ''
-            : widget.item.unitPrice.toStringAsFixed(2);
-        if (_priceController.text != currentPrice) {
-          _priceController.text = currentPrice;
-        }
-
-        _qtyController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _qtyController.text.length),
-        );
-        _priceController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _priceController.text.length),
-        );
-      }
-    });
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Text(
-                  '${widget.itemNumber}.',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
+                Text('${widget.itemNumber}.',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    widget.item.product.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
+                    child: Text(widget.item.product.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold))),
                 IconButton(
-                  onPressed: widget.onRemove,
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                ),
+                    onPressed: widget.onRemove,
+                    icon: const Icon(Icons.delete_outline, color: Colors.red)),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _qtyController,
-                    decoration: const InputDecoration(
-                      labelText: 'الكمية',
-                      hintText: '1',
-                    ),
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    onChanged: (val) =>
-                        widget.onQuantityChanged(int.tryParse(val) ?? 0),
-                  ),
-                ),
+                    flex: 2,
+                    child: _buildTextField(
+                        _qtyController, 'الكمية', _qtyFocusNode, (val) {
+                      final qty = int.tryParse(val) ?? 0;
+                      final price =
+                          double.tryParse(_priceController.text) ?? 0.0;
+                      widget.onStateChange(qty, price);
+                    })),
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'السعر',
-                      prefixText: '\$',
-                      hintText: '0.0',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    textAlign: TextAlign.center,
-                    onChanged: (val) =>
-                        widget.onPriceChanged(double.tryParse(val) ?? 0.0),
-                  ),
-                ),
+                    flex: 3,
+                    child: _buildTextField(
+                        _priceController, 'السعر', _priceFocusNode, (val) {
+                      final price = double.tryParse(val) ?? 0.0;
+                      final qty = int.tryParse(_qtyController.text) ?? 0;
+                      widget.onStateChange(qty, price);
+                    }, isPrice: true)),
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 3,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'الإجمالي',
-                      border: OutlineInputBorder(),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '\$${widget.item.subtotal.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
+                    flex: 3,
+                    child: _buildTextField(
+                        _totalController, 'الإجمالي', _totalFocusNode, (val) {
+                      final total = double.tryParse(val) ?? 0.0;
+                      final quantity = int.tryParse(_qtyController.text) ?? 1;
+                      if (quantity > 0) {
+                        widget.onStateChange(quantity, total / quantity);
+                      }
+                    }, isPrice: true)),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label,
+      FocusNode focusNode, ValueChanged<String> onChanged,
+      {bool isPrice = false}) {
+    return TextFormField(
+      controller: controller,
+      focusNode: focusNode,
+      decoration:
+          InputDecoration(labelText: label, prefixText: isPrice ? '\$ ' : null),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      textAlign: TextAlign.center,
+      onChanged: onChanged,
     );
   }
 }

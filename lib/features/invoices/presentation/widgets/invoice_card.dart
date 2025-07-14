@@ -1,12 +1,12 @@
-// lib/features/invoices/presentation/widgets/invoice_card.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:syria_store/features/invoices/data/models/invoice_model.dart';
+// --- بداية الإضافة: استيراد الملف الذي يحتوي على الـ provider ---
 import 'package:syria_store/features/suppliers/presentation/providers/supplier_details_provider.dart';
+// --- نهاية الإضافة ---
 
 class InvoiceCard extends ConsumerWidget {
-  // -- التصحيح الأول: استخدام اسم الكلاس الصحيح --
   final InvoiceModel invoice;
 
   const InvoiceCard({super.key, required this.invoice});
@@ -14,10 +14,9 @@ class InvoiceCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    // نفترض أن هذا الـ provider يجلب ملخصًا ماليًا للعميل المرتبط بالفاتورة
-    final financialSummaryAsync = invoice.customerName != null
-        ? ref.watch(supplierFinancialSummaryProvider(
-            invoice.id)) // Assuming customerId is on invoice
+
+    final financialSummaryAsync = invoice.contactId != null
+        ? ref.watch(contactFinancialSummaryProvider(invoice.contactId!))
         : null;
 
     return Card(
@@ -48,35 +47,27 @@ class InvoiceCard extends ConsumerWidget {
               'المبلغ الإجمالي: ${NumberFormat.simpleCurrency(locale: 'en_US').format(invoice.totalAmount)}',
             ),
             const SizedBox(height: 8),
-
-            // -- التصحيح الثاني: استخدام . للوصول للبيانات --
             if (financialSummaryAsync != null)
               financialSummaryAsync.when(
                 data: (summary) {
-                  // استخدام dot notation والأسماء الصحيحة من الموديل
                   final balance = summary.balance;
-
-                  // لا نعرض شيئًا إذا كان الرصيد صفرًا
-                  if (balance == 0) {
+                  if (balance == 0 && invoice.paymentMethod == 'cash') {
                     return const SizedBox.shrink();
                   }
-
                   return Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'الرصيد المتبقي للعميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(balance)}',
-                          style: TextStyle(
-                              color: balance > 0
-                                  ? Colors.red.shade700
-                                  : Colors.green.shade700),
-                        ),
-                      ],
+                    child: Text(
+                      'الرصيد الإجمالي للعميل: ${NumberFormat.simpleCurrency(locale: 'en_US').format(balance)}',
+                      style: TextStyle(
+                        color: balance > 0
+                            ? Colors.red.shade700
+                            : Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   );
                 },

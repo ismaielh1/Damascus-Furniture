@@ -16,31 +16,15 @@ final allProductsProvider = FutureProvider.autoDispose<List<ProductModel>>((
   final searchQuery = ref.watch(productSearchQueryProvider);
 
   try {
-    var query = supabase.from('products').select('*, contacts(name)');
+    // --- بداية التعديل: تصحيح العلاقة واستخدام البحث المرن ---
+    var query = supabase.from('products').select(
+        '*, contacts:default_contact_id(name)'); // تصحيح طريقة طلب العلاقة
 
     if (searchQuery.isNotEmpty) {
-      // -- بداية التعديل: لدعم البحث ببداية الكلمة --
-
-      // 1. تقسيم النص إلى كلمات
-      final terms = searchQuery
-          .trim()
-          .split(' ')
-          .where((s) => s.isNotEmpty)
-          .toList();
-
-      if (terms.isNotEmpty) {
-        // 2. إضافة علامة البحث بالبداية ":*" إلى آخر كلمة فقط
-        terms[terms.length - 1] = '${terms.last}:*';
-
-        // 3. تجميع الكلمات من جديد
-        // مثال: "طاولة خش" -> "طاولة & خش:*"
-        final formattedQuery = terms.join(' & ');
-
-        // 4. تنفيذ البحث
-        query = query.textSearch('fts', formattedQuery, config: 'simple');
-      }
-      // -- نهاية التعديل --
+      // استخدام البحث المرن الذي أعجبك
+      query = query.or('name.ilike.%$searchQuery%,sku.ilike.%$searchQuery%');
     }
+    // --- نهاية التعديل ---
 
     final response = await query.order('created_at', ascending: false);
     final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(
@@ -53,31 +37,34 @@ final allProductsProvider = FutureProvider.autoDispose<List<ProductModel>>((
   }
 });
 
+// ... باقي الملف يبقى كما هو ...
 final productDetailsProvider = FutureProvider.autoDispose
     .family<ProductModel?, String>((ref, productId) async {
-      final supabase = ref.watch(supabaseProvider);
-      try {
-        final response = await supabase
-            .from('products')
-            .select('*, contacts(name)')
-            .eq('id', productId)
-            .single();
-        return ProductModel.fromJson(response);
-      } catch (e) {
-        debugPrint('Error fetching product details: $e');
-        return null;
-      }
-    });
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase
+        .from('products')
+        .select(
+            '*, contacts:default_contact_id(name)') // تصحيح العلاقة هنا أيضًا
+        .eq('id', productId)
+        .single();
+    return ProductModel.fromJson(response);
+  } catch (e) {
+    debugPrint('Error fetching product details: $e');
+    return null;
+  }
+});
 
 final productControllerProvider =
     StateNotifierProvider.autoDispose<ProductController, bool>((ref) {
-      return ProductController(ref: ref);
-    });
+  return ProductController(ref: ref);
+});
 
 class ProductController extends StateNotifier<bool> {
   final Ref ref;
   ProductController({required this.ref}) : super(false);
 
+  // ... باقي دوال الكنترولر تبقى كما هي ...
   Future<bool> addProduct({
     required BuildContext context,
     required String name,
@@ -87,17 +74,12 @@ class ProductController extends StateNotifier<bool> {
   }) async {
     state = true;
     try {
-      await ref
-          .read(supabaseProvider)
-          .rpc(
-            'create_product_with_sku',
-            params: {
-              'product_name': name,
-              'p_default_contact_id': contactId,
-              'p_description': description,
-              'p_unit_of_measure': unitOfMeasure,
-            },
-          );
+      await ref.read(supabaseProvider).rpc('create_product_with_sku', params: {
+        'product_name': name,
+        'p_default_contact_id': contactId,
+        'p_description': description,
+        'p_unit_of_measure': unitOfMeasure,
+      });
       ref.invalidate(allProductsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -132,17 +114,15 @@ class ProductController extends StateNotifier<bool> {
   }) async {
     state = true;
     try {
-      await ref
-          .read(supabaseProvider)
-          .rpc(
-            'update_product',
-            params: {
-              'p_id': productId,
-              'p_name': name,
-              'p_description': description,
-              'p_unit_of_measure': unitOfMeasure,
-            },
-          );
+      await ref.read(supabaseProvider).rpc(
+        'update_product',
+        params: {
+          'p_id': productId,
+          'p_name': name,
+          'p_description': description,
+          'p_unit_of_measure': unitOfMeasure,
+        },
+      );
       ref.invalidate(allProductsProvider);
       ref.invalidate(productDetailsProvider(productId));
       if (context.mounted) {

@@ -9,9 +9,12 @@ class FinancialSummaryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // --- بداية التعديل: استخدام اسم الـ provider الصحيح ---
     final summaryAsync = ref.watch(
-      supplierFinancialSummaryProvider(supplierId),
+      contactFinancialSummaryProvider(supplierId),
     );
+    // --- نهاية التعديل ---
+
     final theme = Theme.of(context);
 
     return summaryAsync.when(

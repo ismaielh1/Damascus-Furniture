@@ -8,10 +8,10 @@ import 'package:syria_store/features/suppliers/presentation/widgets/supplier_det
 import 'package:syria_store/features/suppliers/presentation/widgets/supplier_details/recent_payments_list.dart';
 import 'package:syria_store/features/suppliers/presentation/widgets/supplier_details/receipts_log_list.dart';
 
-
 class SupplierDetailsPage extends ConsumerWidget {
   final String supplierId;
   final String supplierName;
+
   const SupplierDetailsPage({
     super.key,
     required this.supplierId,
@@ -24,7 +24,9 @@ class SupplierDetailsPage extends ConsumerWidget {
       appBar: AppBar(title: Text('سجل: $supplierName')),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(supplierFinancialSummaryProvider(supplierId));
+          // --- بداية التعديل: استخدام الاسم الصحيح عند التحديث ---
+          ref.invalidate(contactFinancialSummaryProvider(supplierId));
+          // --- نهاية التعديل ---
           ref.invalidate(supplierPaymentsProvider(supplierId));
           ref.invalidate(agreementsBySupplierProvider(supplierId));
           ref.invalidate(receiptsByContactProvider(supplierId));

@@ -7,24 +7,62 @@ import 'package:syria_store/features/customers/presentation/providers/customers_
 import 'package:syria_store/features/invoices/presentation/providers/invoice_provider.dart';
 import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
 
-class CustomerSectionWidget extends ConsumerWidget {
+class CustomerSectionWidget extends ConsumerStatefulWidget {
   final bool isWalkInCustomer;
   final ValueChanged<bool?> onWalkInCustomerChanged;
   final TextEditingController manualInvoiceController;
-  final TextEditingController customerAutocompleteController;
 
   const CustomerSectionWidget({
     super.key,
     required this.isWalkInCustomer,
     required this.onWalkInCustomerChanged,
-    required this.manualInvoiceController,
-    required this.customerAutocompleteController,
+    required this.manualInvoiceController, required TextEditingController customerAutocompleteController,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CustomerSectionWidget> createState() =>
+      _CustomerSectionWidgetState();
+}
+
+class _CustomerSectionWidgetState extends ConsumerState<CustomerSectionWidget> {
+  final _autocompleteController = TextEditingController();
+  final _autocompleteFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // يستمع للتغيرات خارج نطاق التركيز ليتحقق من صحة الإدخال
+    _autocompleteFocusNode.addListener(() {
+      if (!_autocompleteFocusNode.hasFocus) {
+        // إذا كان النص لا يطابق العميل المختار، قم بمسح كل شيء
+        final selectedCustomer = ref.read(invoiceFormProvider).selectedCustomer;
+        if (selectedCustomer == null ||
+            _autocompleteController.text != selectedCustomer.name) {
+          _autocompleteController.clear();
+          ref.read(invoiceFormProvider.notifier).setCustomer(null);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autocompleteController.dispose();
+    _autocompleteFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final invoiceState = ref.watch(invoiceFormProvider);
+
+    // تحديث النص في الحقل إذا تم اختيار عميل
+    final selectedCustomer = invoiceState.selectedCustomer;
+    if (selectedCustomer != null &&
+        _autocompleteController.text != selectedCustomer.name) {
+      _autocompleteController.text = selectedCustomer.name;
+    }
 
     return Card(
       elevation: 2,
@@ -38,32 +76,25 @@ class CustomerSectionWidget extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: manualInvoiceController,
-                    decoration: const InputDecoration(
-                      labelText: 'رقم الفاتورة (اختياري)',
-                    ),
-                  ),
-                ),
+                    child: TextFormField(
+                        controller: widget.manualInvoiceController,
+                        decoration: const InputDecoration(
+                            labelText: 'رقم الفاتورة (اختياري)'))),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextFormField(
                     readOnly: true,
                     controller: TextEditingController(
-                      text: DateFormat(
-                        'yyyy/MM/dd',
-                      ).format(invoiceState.invoiceDate),
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'تاريخ الفاتورة',
-                    ),
+                        text: DateFormat('yyyy/MM/dd')
+                            .format(invoiceState.invoiceDate)),
+                    decoration:
+                        const InputDecoration(labelText: 'تاريخ الفاتورة'),
                     onTap: () async {
                       final pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2101),
-                      );
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2101));
                       if (pickedDate != null) {
                         ref
                             .read(invoiceFormProvider.notifier)
@@ -77,10 +108,11 @@ class CustomerSectionWidget extends ConsumerWidget {
             const SizedBox(height: 8),
             CheckboxListTile(
               title: const Text('زبون عابر (بدون اسم)'),
-              value: isWalkInCustomer,
-              onChanged: onWalkInCustomerChanged,
+              value: widget.isWalkInCustomer,
+              onChanged: widget.onWalkInCustomerChanged,
+              controlAffinity: ListTileControlAffinity.leading,
             ),
-            if (!isWalkInCustomer)
+            if (!widget.isWalkInCustomer)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -90,78 +122,58 @@ class CustomerSectionWidget extends ConsumerWidget {
                           option.name,
                       optionsBuilder:
                           (TextEditingValue textEditingValue) async {
-                            if (textEditingValue.text == '') {
-                              return const Iterable<ContactModel>.empty();
-                            }
-                            return await ref.watch(
-                              customerAutocompleteProvider(
-                                textEditingValue.text,
-                              ).future,
-                            );
-                          },
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<ContactModel>.empty();
+                        }
+                        final options = await ref.watch(
+                            customerAutocompleteProvider(textEditingValue.text)
+                                .future);
+                        // الاختيار التلقائي إذا كانت هناك نتيجة واحدة
+                        if (options.length == 1) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            ref
+                                .read(invoiceFormProvider.notifier)
+                                .setCustomer(options.first);
+                          });
+                        }
+                        return options;
+                      },
                       onSelected: (ContactModel selection) {
                         ref
                             .read(invoiceFormProvider.notifier)
                             .setCustomer(selection);
-                        customerAutocompleteController.text = selection.name;
+                        _autocompleteController.text = selection.name;
                       },
-                      fieldViewBuilder:
-                          (
-                            BuildContext context,
-                            TextEditingController fieldController,
-                            FocusNode fieldFocusNode,
-                            VoidCallback onFieldSubmitted,
-                          ) {
-                            return TextFormField(
-                              controller: fieldController,
-                              focusNode: fieldFocusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'ابحث عن اسم العميل أو رقمه',
-                              ),
-                            );
-                          },
-                      optionsViewBuilder:
-                          (
-                            BuildContext context,
-                            AutocompleteOnSelected<ContactModel> onSelected,
-                            Iterable<ContactModel> options,
-                          ) {
-                            return Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                elevation: 4.0,
-                                child: SizedBox(
-                                  height: 200.0,
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.all(8.0),
-                                    itemCount: options.length,
-                                    itemBuilder:
-                                        (BuildContext context, int index) {
-                                          final ContactModel option = options
-                                              .elementAt(index);
-                                          return GestureDetector(
-                                            onTap: () => onSelected(option),
-                                            child: ListTile(
-                                              title: Text(option.name),
-                                              subtitle: Text(
-                                                option.phoneNumber ?? '',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                      fieldViewBuilder: (context, fieldController,
+                          fieldFocusNode, onFieldSubmitted) {
+                        // استخدام المتحكمات الخاصة بنا
+                        _autocompleteController.addListener(() {
+                          fieldController.text = _autocompleteController.text;
+                        });
+                        _autocompleteFocusNode.addListener(() {
+                          if (_autocompleteFocusNode.hasFocus) {
+                            fieldFocusNode.requestFocus();
+                          } else {
+                            fieldFocusNode.unfocus();
+                          }
+                        });
+
+                        return TextFormField(
+                          controller: fieldController,
+                          focusNode: fieldFocusNode,
+                          decoration: const InputDecoration(
+                              labelText: 'ابحث عن اسم العميل أو رقمه',
+                              hintText: 'اكتب للبحث...'),
+                          onFieldSubmitted: (_) => onFieldSubmitted(),
+                        );
+                      },
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
                     onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) => const AddEditCustomerDialog(),
-                    ),
+                        context: context,
+                        builder: (_) => const AddEditCustomerDialog()),
                     tooltip: 'إضافة عميل جديد',
                   ),
                 ],

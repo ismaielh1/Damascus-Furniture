@@ -1,4 +1,3 @@
-// lib/features/suppliers/data/models/supplier_agreement_model.dart
 import 'package:syria_store/features/suppliers/data/models/contact_model.dart';
 
 class SupplierAgreement {
@@ -7,7 +6,7 @@ class SupplierAgreement {
   final String? contactName;
   final String agreementDetails;
   final double totalAmount;
-  final DateTime agreement_date; // -- تم إضافة تاريخ الإنشاء --
+  final DateTime agreement_date;
   final DateTime? expectedDeliveryDate;
   final String status;
   final double? down_payment;
@@ -19,7 +18,7 @@ class SupplierAgreement {
     this.contactName,
     required this.agreementDetails,
     required this.totalAmount,
-    required this.agreement_date, // -- تمت الإضافة --
+    required this.agreement_date,
     this.expectedDeliveryDate,
     required this.status,
     this.down_payment,
@@ -29,11 +28,16 @@ class SupplierAgreement {
   factory SupplierAgreement.fromJson(Map<String, dynamic> json) {
     return SupplierAgreement(
       id: json['id'] ?? '',
-      contactId: json['contacts'] != null ? json['contacts']['id'] : null,
-      contactName: json['contacts'] != null ? json['contacts']['name'] : null,
-      agreementDetails: json['agreement_details'] ?? '',
-      totalAmount: double.tryParse(json['total_amount']?.toString() ?? '0.0') ?? 0.0,
-      agreement_date: DateTime.parse(json['agreement_date']), // -- تمت الإضافة --
+      // Ensure it reads from 'contacts' object
+      contactId: json['contacts'] != null
+          ? json['contacts']['id']
+          : json['contact_id'],
+      contactName:
+          json['contacts'] != null ? json['contacts']['name'] : 'مورد غير محدد',
+      agreementDetails: json['notes'] ?? '', // DB column is 'notes'
+      totalAmount:
+          double.tryParse(json['total_amount']?.toString() ?? '0.0') ?? 0.0,
+      agreement_date: DateTime.parse(json['agreement_date']),
       expectedDeliveryDate: json['expected_delivery_date'] != null
           ? DateTime.tryParse(json['expected_delivery_date'])
           : null,

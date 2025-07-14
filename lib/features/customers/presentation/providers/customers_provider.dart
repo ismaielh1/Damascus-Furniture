@@ -6,22 +6,19 @@ import 'package:syria_store/features/suppliers/presentation/providers/agreement_
 
 final customerSearchQueryProvider = StateProvider<String>((ref) => '');
 
-// Provider لجلب كل العملاء (يظل مفيداً لصفحة قائمة العملاء)
-final allCustomersProvider = FutureProvider.autoDispose<List<ContactModel>>((
-  ref,
-) async {
+// Provider to fetch all customers with search
+final allCustomersProvider =
+    FutureProvider.autoDispose<List<ContactModel>>((ref) async {
   final supabase = ref.watch(supabaseProvider);
   final searchQuery = ref.watch(customerSearchQueryProvider);
-
   try {
     var query = supabase.from('contacts').select().eq('is_customer', true);
 
     if (searchQuery.isNotEmpty) {
-      query = query.or(
-        'name.ilike.%$searchQuery%,code.ilike.%$searchQuery%,phone_number.ilike.%$searchQuery%',
-      );
+      // -- Use ILIKE for flexible 'contains' search --
+      query = query
+          .or('name.ilike.%$searchQuery%,phone_number.ilike.%$searchQuery%');
     }
-
     final response = await query.order('name', ascending: true);
     return response.map((item) => ContactModel.fromJson(item)).toList();
   } catch (e) {
@@ -30,37 +27,36 @@ final allCustomersProvider = FutureProvider.autoDispose<List<ContactModel>>((
   }
 });
 
-// -- بداية الإضافة: Provider جديد للبحث التفاعلي في حقل الإكمال التلقائي --
+// Provider for the interactive autocomplete field
 final customerAutocompleteProvider = FutureProvider.autoDispose
     .family<List<ContactModel>, String>((ref, query) async {
-      if (query.isEmpty) {
-        return [];
-      }
-      final supabase = ref.watch(supabaseProvider);
-      try {
-        final response = await supabase
-            .from('contacts')
-            .select()
-            .eq('is_customer', true)
-            .or('name.ilike.%$query%,phone_number.ilike.%$query%')
-            .limit(10); // نحدد عدد النتائج لتخفيف العبء
-        return response.map((item) => ContactModel.fromJson(item)).toList();
-      } catch (e) {
-        print('Error during customer autocomplete search: $e');
-        return [];
-      }
-    });
-// -- نهاية الإضافة --
+  if (query.isEmpty) return [];
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    // --- تم التعديل هنا لاستخدام البحث المرن ---
+    final response = await supabase
+        .from('contacts')
+        .select()
+        .eq('is_customer', true)
+        .or('name.ilike.%$query%,phone_number.ilike.%$query%')
+        .limit(10);
+    return response.map((item) => ContactModel.fromJson(item)).toList();
+  } catch (e) {
+    print('Error during customer autocomplete search: $e');
+    return [];
+  }
+});
 
 final customerControllerProvider =
     StateNotifierProvider.autoDispose<CustomerController, bool>((ref) {
-      return CustomerController(ref: ref);
-    });
+  return CustomerController(ref: ref);
+});
 
 class CustomerController extends StateNotifier<bool> {
   final Ref _ref;
-  CustomerController({required Ref ref}) : _ref = ref, super(false);
-
+  CustomerController({required Ref ref})
+      : _ref = ref,
+        super(false);
   Future<bool> addCustomer({
     required BuildContext context,
     required String name,
@@ -70,21 +66,15 @@ class CustomerController extends StateNotifier<bool> {
     if (state) return false;
     state = true;
     try {
-      await _ref
-          .read(supabaseProvider)
-          .rpc(
-            'add_contact',
-            params: {
-              'p_name': name,
-              'p_phone_number': phone,
-              'p_address': address,
-              'p_is_supplier': false,
-              'p_is_customer': true,
-              'p_category_id': null,
-            },
-          );
+      await _ref.read(supabaseProvider).rpc('add_contact', params: {
+        'p_name': name,
+        'p_phone_number': phone,
+        'p_address': address,
+        'p_is_supplier': false,
+        'p_is_customer': true,
+        'p_category_id': null,
+      });
       _ref.invalidate(allCustomersProvider);
-
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
